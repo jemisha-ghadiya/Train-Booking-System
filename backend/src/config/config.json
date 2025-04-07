@@ -1,0 +1,26 @@
+{
+  "development": {
+    "username": "postgres",
+    "password": "root",
+    "database": "train_booking",
+    "host": "localhost",
+    "port": 4000,
+    "dialect": "postgres"
+  },
+  "test": {
+    "username": "postgres",
+    "password": "root",
+    "database": "train_booking_test",
+    "host": "localhost",
+    "port": 4000,
+    "dialect": "postgres"
+  },
+  "production": {
+    "username": "postgres",
+    "password": "root",
+    "database": "train_booking",
+    "host": "localhost",
+    "port": 4000,
+    "dialect": "postgres"
+  }
+} 
