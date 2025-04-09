@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { createTrain ,getTrainById,deleteTrain,updateTrain} from '../controllers/train.controller';
+import { createTrain ,getTrainById,deleteTrain,updateTrain,createPaymentIntent} from '../controllers/train.controller';
 import { verifyToken } from '../middleware/auth';
 import {
   getAllTrains,
@@ -10,7 +10,7 @@ import {
 } from '../controllers/train.controller';
 
 const router = Router();
-
+router.post('/create-payment-intent', createPaymentIntent);
 // Public routes
 router.get('/', getAllTrains);
 router.post('/search', searchTrains);

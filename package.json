@@ -3,7 +3,12 @@
     "@types/js-cookie": "^3.0.6"
   },
   "dependencies": {
+    "@stripe/react-stripe-js": "^3.6.0",
     "date-fns": "^4.1.0",
-    "react-datepicker": "^8.2.1"
+    "jwt-decode": "^4.0.0",
+    "nookies": "^2.5.2",
+    "react-cookie": "^8.0.1",
+    "react-datepicker": "^8.2.1",
+    "react-router-dom": "^7.5.0"
   }
 }

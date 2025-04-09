@@ -53,7 +53,7 @@ export default function Home() {
       setSearchMessage(data.trains.length > 0 ? '' : 'No trains found matching the search criteria.');
     } catch (error) {
       console.error('Error searching trains:', error);
-      setSearchMessage('Error searching trains. Please try again later.');
+      setSearchMessage('Trains can not found');
     }
   };
 

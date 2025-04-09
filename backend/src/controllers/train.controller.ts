@@ -4,7 +4,19 @@ import Train from '../models/train.model';
 import Booking from '../models/booking.model';
 import { verifyToken } from '../middleware/auth';
 import User from '../models/user.model';
+import Stripe from 'stripe';
 
+interface AuthenticatedRequest extends Request {
+  user?: {
+    id: number;
+    email: string;
+  };
+}
+
+// Initialize Stripe with your secret key from environment variables
+const stripe = new Stripe(process.env.STRIPE_SECRET_KEY as string, {
+  apiVersion: '2025-03-31.basil',
+});
 // Get all available trains
 // export const getAllTrains = async (req: Request, res: Response) => {
 //   try {
@@ -50,7 +62,7 @@ export const searchTrains = async (req: Request, res: Response) => {
     // Set the date range for the search
     const startDate = new Date(parsedDate);
     startDate.setHours(0, 0, 0, 0);
-    
+
     const endDate = new Date(parsedDate);
     endDate.setHours(23, 59, 59, 999);
 
@@ -119,10 +131,69 @@ export const searchTrains = async (req: Request, res: Response) => {
 
 
 // Book a train ticket
-export const createBooking = async (req: Request, res: Response) => {
+// export const createBooking = async (req: Request, res: Response) => {
+//   const {
+//     trainId,
+//     userId,
+//     passengerName,
+//     passengerAge,
+//     seatNumber,
+//     class: bookingClass,
+//     status
+//   } = req.body;
+
+//   try {
+//     // Check if the train exists
+//     const train = await Train.findByPk(trainId);
+//     if (!train) {
+//       return res.status(404).json({ message: 'Train not found' });
+//     }
+
+//     // Check if the user exists
+//     const user = await User.findByPk(userId);
+//     if (!user) {
+//       return res.status(404).json({ message: 'User not found' });
+//     }
+
+//     // Validate status
+//     if (status !== 'confirmed' && status !== 'cancelled') {
+//       return res.status(400).json({
+//         message: 'Invalid status. It must be either "confirmed" or "cancelled".'
+//       });
+//     }
+
+//     // Optionally validate class (e.g., restrict to specific values)
+//     const allowedClasses = ['Economy', 'Business', 'Sleeper', 'AC First Class'];
+//     if (!allowedClasses.includes(bookingClass)) {
+//       return res.status(400).json({
+//         message: `Invalid class. Allowed values: ${allowedClasses.join(', ')}.`
+//       });
+//     }
+
+//     // Create the booking
+//     const newBooking = await Booking.create({
+//       trainId,
+//       userId,
+//       passengerName,
+//       passengerAge,
+//       seatNumber,
+//       class: bookingClass,
+//       status
+//     });
+
+//     return res.status(201).json({
+//       message: 'Booking created successfully',
+//       booking: newBooking
+//     });
+//   } catch (error) {
+//     console.error(error);
+//     return res.status(500).json({ message: 'Error creating booking', error });
+//   }
+// };
+
+export const createBooking = async (req: AuthenticatedRequest, res: Response) => {
   const {
     trainId,
-    userId,
     passengerName,
     passengerAge,
     seatNumber,
@@ -131,35 +202,37 @@ export const createBooking = async (req: Request, res: Response) => {
   } = req.body;
 
   try {
-    // Check if the train exists
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ message: 'User not authenticated' });
+    }
+
     const train = await Train.findByPk(trainId);
     if (!train) {
       return res.status(404).json({ message: 'Train not found' });
     }
 
-    // Check if the user exists
     const user = await User.findByPk(userId);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Validate status
     if (status !== 'confirmed' && status !== 'cancelled') {
       return res.status(400).json({
         message: 'Invalid status. It must be either "confirmed" or "cancelled".'
       });
     }
 
-    // Optionally validate class (e.g., restrict to specific values)
-    const allowedClasses = ['Economy', 'Business', 'Sleeper', 'AC First Class'];
+    const allowedClasses = ['GENERAL', 'SLEEPER', 'AC'];
     if (!allowedClasses.includes(bookingClass)) {
       return res.status(400).json({
         message: `Invalid class. Allowed values: ${allowedClasses.join(', ')}.`
       });
     }
 
-    // Create the booking
-    const newBooking = await Booking.create({
+    // Create booking
+    const booking = await Booking.create({
       trainId,
       userId,
       passengerName,
@@ -169,16 +242,12 @@ export const createBooking = async (req: Request, res: Response) => {
       status
     });
 
-    return res.status(201).json({
-      message: 'Booking created successfully',
-      booking: newBooking
-    });
+    return res.status(201).json({ message: 'Booking created successfully', booking });
   } catch (error) {
-    console.error(error);
-    return res.status(500).json({ message: 'Error creating booking', error });
+    console.error('Booking creation error:', error);
+    return res.status(500).json({ message: 'Internal server error' });
   }
 };
-
 
 // Get user's bookings
 export const getUserBookings = async (req: Request, res: Response) => {
@@ -223,7 +292,7 @@ export const cancelBooking = async (req: Request, res: Response) => {
   } catch (error) {
     res.status(500).json({ message: 'Error cancelling booking', error });
   }
-}; 
+};
 
 export const createTrain = async (req: Request, res: Response) => {
   try {
@@ -318,5 +387,27 @@ export const deleteTrain = async (req: Request, res: Response) => {
   } catch (error) {
     console.error(error);
     return res.status(500).json({ message: 'Error deleting train', error });
+  }
+};
+
+// Create a payment intent
+export const createPaymentIntent = async (req: Request, res: Response) => {
+  try {
+    const { price } = req.body;
+    console.log(price,"price");
+    const paymentIntent = await stripe.paymentIntents.create({
+      amount: Number(price),
+      currency: 'inr',
+      automatic_payment_methods: {
+        enabled: true,
+      },
+    });
+
+    res.status(200).send({
+      clientSecret: paymentIntent.client_secret,
+    });
+  } catch (error: any) {
+    console.error('Error creating payment intent:', error?.message, error?.stack);
+    res.status(500).json({ message: 'Error creating payment intent', error });
   }
 };
