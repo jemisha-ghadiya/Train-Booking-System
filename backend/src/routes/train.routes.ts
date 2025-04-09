@@ -13,23 +13,26 @@ const router = Router();
 
 // Public routes
 router.get('/', getAllTrains);
-router.get('/search', searchTrains);
-router.get('/trains', getAllTrains);
-router.post('/trains_create',verifyToken, createTrain);
+router.post('/search', searchTrains);
+router.get('/:id', getTrainById);
+
+// Protected routes
+router.use(verifyToken);
+router.post('/trains_create', createTrain);
 
 // Route to get a specific train by ID
-router.get('/trains/:id',verifyToken, getTrainById);
+router.get('/trains/:id', getTrainById);
 
 // Route to update a train by ID
-router.put('/trains/:id',verifyToken, updateTrain);
+router.put('/trains/:id', updateTrain);
 
 // Route to delete a train by ID
 router.delete('/trains/:id',verifyToken, deleteTrain);
 
 
 // Protected routes (require authentication)
-router.post('/bookings', verifyToken, createBooking);
-router.get('/bookings', verifyToken, getUserBookings);
-router.put('/bookings/:bookingId/cancel', verifyToken, cancelBooking);
+router.post('/bookings', createBooking);
+router.get('/bookings',  getUserBookings);
+router.put('/bookings/:bookingId/cancel',  cancelBooking);
 
 export default router; 

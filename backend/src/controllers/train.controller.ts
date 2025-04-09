@@ -15,28 +15,120 @@ import User from '../models/user.model';
 //   }
 // };
 
-// Search trains by source and destination
+// Search trains by source, destination, and departure date
 export const searchTrains = async (req: Request, res: Response) => {
   try {
-    const { source, destination, date } = req.query;
+    const { source, destination, departureDate } = req.body;
+
+    // Validate required parameters
+    if (!source || !destination || !departureDate) {
+      return res.status(400).json({
+        message: 'Missing required search parameters',
+        required: {
+          source: 'Source station is required',
+          destination: 'Destination station is required',
+          departureDate: 'Departure date is required'
+        },
+        provided: {
+          source: source || 'Not provided',
+          destination: destination || 'Not provided',
+          departureDate: departureDate || 'Not provided'
+        }
+      });
+    }
+
+    // Validate date format
+    const parsedDate = new Date(departureDate as string);
+    if (isNaN(parsedDate.getTime())) {
+      return res.status(400).json({
+        message: 'Invalid date format',
+        error: 'Please provide a valid date in YYYY-MM-DD format',
+        providedDate: departureDate
+      });
+    }
+
+    // Set the date range for the search
+    const startDate = new Date(parsedDate);
+    startDate.setHours(0, 0, 0, 0);
     
-    const trains = await Train.findAll({
-      where: {
-        source: source as string,
-        destination: destination as string,
-        departureDate: date as string
+    const endDate = new Date(parsedDate);
+    endDate.setHours(23, 59, 59, 999);
+
+    // Build the where clause for the search
+    const whereClause = {
+      source: source.toString().trim(),
+      destination: destination.toString().trim(),
+      departureTime: {
+        [Op.between]: [startDate, endDate]
       }
+    };
+
+    console.log('Search parameters:', whereClause); // Debug log
+
+    // Find trains matching the search criteria
+    const trains = await Train.findAll({
+      where: whereClause,
+      order: [['departureTime', 'ASC']]
     });
-    
-    res.status(200).json(trains);
+
+    console.log('Found trains:', trains.length); // Debug log
+
+    if (trains.length === 0) {
+      return res.status(404).json({
+        message: 'No trains found matching the search criteria',
+        searchParams: {
+          source: source.toString().trim(),
+          destination: destination.toString().trim(),
+          departureDate: departureDate.toString().trim()
+        },
+        suggestion: 'Try adjusting your search parameters or check for alternative dates'
+      });
+    }
+
+    return res.status(200).json({
+      message: 'Trains found successfully',
+      count: trains.length,
+      searchParams: {
+        source: source.toString().trim(),
+        destination: destination.toString().trim(),
+        departureDate: departureDate.toString().trim()
+      },
+      trains: trains.map(train => ({
+        id: train.id,
+        trainNumber: train.trainNumber,
+        trainName: train.trainName,
+        source: train.source,
+        destination: train.destination,
+        departureTime: train.departureTime,
+        arrivalTime: train.arrivalTime,
+        totalSeats: train.totalSeats,
+        availableSeats: train.availableSeats,
+        fare: train.fare
+      }))
+    });
   } catch (error) {
-    res.status(500).json({ message: 'Error searching trains', error });
+    console.error('Error searching trains:', error);
+    return res.status(500).json({
+      message: 'Error searching trains',
+      error: error instanceof Error ? error.message : 'Unknown error'
+    });
   }
 };
 
+
+
+
 // Book a train ticket
 export const createBooking = async (req: Request, res: Response) => {
-  const { trainId, userId, passengerName, passengerAge, seatNumber, status } = req.body;
+  const {
+    trainId,
+    userId,
+    passengerName,
+    passengerAge,
+    seatNumber,
+    class: bookingClass,
+    status
+  } = req.body;
 
   try {
     // Check if the train exists
@@ -51,9 +143,19 @@ export const createBooking = async (req: Request, res: Response) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // Validate the status
+    // Validate status
     if (status !== 'confirmed' && status !== 'cancelled') {
-      return res.status(400).json({ message: 'Invalid status. It must be either "confirmed" or "cancelled".' });
+      return res.status(400).json({
+        message: 'Invalid status. It must be either "confirmed" or "cancelled".'
+      });
+    }
+
+    // Optionally validate class (e.g., restrict to specific values)
+    const allowedClasses = ['Economy', 'Business', 'Sleeper', 'AC First Class'];
+    if (!allowedClasses.includes(bookingClass)) {
+      return res.status(400).json({
+        message: `Invalid class. Allowed values: ${allowedClasses.join(', ')}.`
+      });
     }
 
     // Create the booking
@@ -63,16 +165,17 @@ export const createBooking = async (req: Request, res: Response) => {
       passengerName,
       passengerAge,
       seatNumber,
-      status,
+      class: bookingClass,
+      status
     });
 
     return res.status(201).json({
       message: 'Booking created successfully',
-      booking: newBooking,
+      booking: newBooking
     });
   } catch (error) {
     console.error(error);
-    return res.status(500).json({ message: 'Error creating booking', error});
+    return res.status(500).json({ message: 'Error creating booking', error });
   }
 };
 

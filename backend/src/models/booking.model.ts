@@ -10,6 +10,7 @@ class Booking extends Model {
   public passengerName!: string;
   public passengerAge!: number;
   public seatNumber!: string;
+  public class!: string; // New field
   public bookingDate!: Date;
   public status!: 'confirmed' | 'cancelled';
 }
@@ -46,6 +47,10 @@ Booking.init(
       allowNull: false,
     },
     seatNumber: {
+      type: DataTypes.STRING,
+      allowNull: false,
+    },
+    class: {
       type: DataTypes.STRING,
       allowNull: false,
     },
