@@ -393,21 +393,33 @@ export const deleteTrain = async (req: Request, res: Response) => {
 // Create a payment intent
 export const createPaymentIntent = async (req: Request, res: Response) => {
   try {
-    const { price } = req.body;
-    console.log(price,"price");
+    const { amount } = req.body;
+
+    if (!amount || isNaN(amount) || amount <= 0) {
+      return res.status(400).json({
+        message: 'Invalid amount. Please provide a valid positive number.',
+      });
+    }
+
+    // Convert to integer and ensure it's a valid amount
+    const amountInPaise = Math.round(Number(amount));
+
     const paymentIntent = await stripe.paymentIntents.create({
-      amount: Number(price),
+      amount: amountInPaise,
       currency: 'inr',
       automatic_payment_methods: {
         enabled: true,
       },
     });
 
-    res.status(200).send({
+    res.status(200).json({
       clientSecret: paymentIntent.client_secret,
     });
   } catch (error: any) {
-    console.error('Error creating payment intent:', error?.message, error?.stack);
-    res.status(500).json({ message: 'Error creating payment intent', error });
+    console.error('Error creating payment intent:', error?.message);
+    res.status(500).json({ 
+      message: 'Error creating payment intent',
+      error: error?.message 
+    });
   }
 };

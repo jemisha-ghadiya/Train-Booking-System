@@ -35,6 +35,18 @@ interface Seat {
   fare: number;
 }
 
+interface BookingResponse {
+  id: number;
+  trainId: number;
+  userId: number;
+  passengerName: string;
+  passengerAge: number;
+  seatNumber: string;
+  class: string;
+  bookingDate: string;
+  status: string;
+}
+
 export default function BookingPage() {
   const params = useParams();
   const trainId = params.id;
@@ -56,6 +68,7 @@ export default function BookingPage() {
   const [availableSeats, setAvailableSeats] = useState<Seat[]>([]);
   const [clientSecret, setClientSecret] = useState('');
   const [selectedClass, setSelectedClass] = useState<'GENERAL' | 'SLEEPER' | 'AC'>('GENERAL');
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
 
   // Define the state or replace it with the correct variable
   const address = 'Your Address Here'; // Replace with actual address logic
@@ -201,27 +214,27 @@ export default function BookingPage() {
 
   const filteredSeats = availableSeats.filter((seat: Seat) => seat.class === selectedClass);
 
-  // Add a function to handle payment
+  // Update the handlePayment function
   const handlePayment = async () => {
     try {
       // Validate passenger details first
-    //   if (!bookingData.passengerName || bookingData.passengerName.length < 2) {
-    //     setError('Passenger name must be at least 2 characters long.');
-    //     return;
-    //   }
-    //   if (!bookingData.passengerAge || isNaN(Number(bookingData.passengerAge)) || Number(bookingData.passengerAge) < 1 || Number(bookingData.passengerAge) > 120) {
-    //     setError('Passenger age must be a number between 1 and 120.');
-    //     return;
-    //   }
-    //   if (!bookingData.seatNumber) {
-    //     setError('Please select a seat.');
-    //     return;
-    //   }
+      if (!bookingData.passengerName || bookingData.passengerName.length < 2) {
+        setError('Passenger name must be at least 2 characters long.');
+        return;
+      }
+      if (!bookingData.passengerAge || isNaN(Number(bookingData.passengerAge)) || Number(bookingData.passengerAge) < 1 || Number(bookingData.passengerAge) > 120) {
+        setError('Passenger age must be a number between 1 and 120.');
+        return;
+      }
+      if (!bookingData.seatNumber) {
+        setError('Please select a seat.');
+        return;
+      }
 
       // Clear any previous error
       setError('');
 
-      // 1. Create a payment intent on the server
+      // Create a payment intent on the server
       const response = await fetch('http://localhost:3000/api/trains/create-payment-intent', {
         method: 'POST',
         headers: {
@@ -229,42 +242,70 @@ export default function BookingPage() {
         },
         credentials: 'include',
         body: JSON.stringify({
-          price: selectedAmount * 100, // Convert to smallest currency unit (paise)
+          amount: selectedAmount * 100, // Convert to smallest currency unit (paise)
         }),
       });
 
       if (!response.ok) {
         throw new Error('Failed to create payment intent');
       }
-      const { clientSecret } = await response.json();
-      console.log(clientSecret,"clientSecret");
-      setClientSecret(clientSecret);
 
-      // 2. Load Stripe
-      const stripe = await stripePromise;
-      if (!stripe) {
-        throw new Error('Stripe failed to load');
-      }
-      console.log(stripe,"stripe");
-      // 3. Confirm the payment
-      const resp = await stripe.confirmPayment({
-        elements: await stripe.elements({
-          clientSecret
-        }),
-        confirmParams: {
-          return_url: `${window.location.origin}/bookings`,
-        },
-      });
-      console.log(resp,"resp");
-    //   if (resp.error) {
-    //     throw new Error(resp.error.message);
-    //   }
-    router.push(`/paymentModel?clientSecret=${clientSecret}`);
-      await handleSubmit();
+      const { clientSecret } = await response.json();
+      setClientSecret(clientSecret);
+      setShowPaymentModal(true); // Show the payment modal
     } catch (err: any) {
       setError(err.message || 'Error processing payment');
-      console.log(err?.message, err?.stack,"err");
+      console.error('Payment error:', err);
     }
+  };
+
+  const handlePaymentSuccess = async () => {
+    try {
+      // First create the booking
+      const response = await fetch('http://localhost:3000/api/trains/bookings', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          trainId: trainId,
+          userId: userId,
+          passengerName: bookingData.passengerName,
+          passengerAge: parseInt(bookingData.passengerAge),
+          seatNumber: bookingData.seatNumber,
+          class: bookingData.class,
+          bookingDate: bookingData.bookingDate,
+          status: bookingData.status
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to create booking');
+      }
+
+      const createdBooking: BookingResponse = await response.json();
+      
+      // Close the payment modal
+      setShowPaymentModal(false);
+      
+      // Show success message
+      alert('Booking created successfully!');
+      
+      // Redirect to the bookings page with a small delay to ensure the booking is saved
+      setTimeout(() => {
+        router.push('/dashboard/bookings');
+      }, 1000);
+    } catch (err) {
+      console.error('Error creating booking:', err);
+      setError('Failed to create booking after payment');
+      setShowPaymentModal(false);
+    }
+  };
+
+  const handleClosePaymentModal = () => {
+    setShowPaymentModal(false);
+    setClientSecret('');
   };
 
   if (loading) return <div className="text-center p-8">Loading...</div>;
@@ -461,7 +502,15 @@ export default function BookingPage() {
         </form>
       </div>
 
-      {clientSecret && <PaymentModal clientSecret={clientSecret} address={address} />}
+      {/* Update the PaymentModal rendering */}
+      {showPaymentModal && clientSecret && (
+        <PaymentModal 
+          clientSecret={clientSecret} 
+          address={address}
+          onSuccess={handlePaymentSuccess}
+          onClose={handleClosePaymentModal}
+        />
+      )}
     </div>
   );
 } 

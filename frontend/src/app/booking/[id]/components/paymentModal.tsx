@@ -9,9 +9,11 @@ const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!
 interface PaymentModalProps {
   clientSecret: string;
   address: string;
+  onSuccess?: () => void;
+  onClose?: () => void;
 }
 
-const PaymentModal: React.FC<PaymentModalProps> = ({ clientSecret, address }) => {
+const PaymentModal: React.FC<PaymentModalProps> = ({ clientSecret, address, onSuccess, onClose }) => {
   if (!clientSecret) {
     return <p>Loading payment information...</p>;
   }
@@ -19,6 +21,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ clientSecret, address }) =>
   // ✅ Use Stripe types explicitly
   const appearance: Appearance = {
     theme: 'stripe', // Valid themes: 'stripe', 'flat', 'night', 'none'
+    variables: {
+      colorPrimary: '#0F766E',
+      colorBackground: '#ffffff',
+      colorText: '#30313d',
+    }
   };
 
   const options: StripeElementsOptions = {
@@ -28,7 +35,11 @@ const PaymentModal: React.FC<PaymentModalProps> = ({ clientSecret, address }) =>
 
   return (
     <Elements stripe={stripePromise} options={options}>
-      <CheckoutForm address={address} />
+      <CheckoutForm 
+        address={address} 
+        onSuccess={onSuccess}
+        onClose={onClose}
+      />
     </Elements>
   );
 };

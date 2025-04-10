@@ -3,6 +3,12 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Navbar from '@/components/Navbar';
+import { jwtDecode } from 'jwt-decode';
+import { loadStripe } from '@stripe/stripe-js';
+import PaymentModal from './components/PaymentModal';
+
+// Initialize Stripe
+const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY!);
 
 interface Train {
   id: number;
@@ -17,25 +23,58 @@ interface Train {
   fare: number;
 }
 
+interface Seat {
+  number: string;
+  isAvailable: boolean;
+  class: 'GENERAL' | 'SLEEPER' | 'AC';
+  fare: number;
+}
+
+interface JwtPayload {
+  id: number;
+  email: string;
+}
+
 export default function BookTrain({ params }: { params: { id: string } }) {
   const router = useRouter();
   const [train, setTrain] = useState<Train | null>(null);
-  const [formData, setFormData] = useState({
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [userId, setUserId] = useState<number | null>(null);
+  const [selectedAmount, setSelectedAmount] = useState(0);
+  const [availableSeats, setAvailableSeats] = useState<Seat[]>([]);
+  const [selectedClass, setSelectedClass] = useState<'GENERAL' | 'SLEEPER' | 'AC'>('GENERAL');
+  const [clientSecret, setClientSecret] = useState('');
+  const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [bookingData, setBookingData] = useState({
     passengerName: '',
     passengerAge: '',
     seatNumber: '',
+    class: 'GENERAL',
+    bookingDate: new Date().toISOString().split('T')[0],
+    status: 'confirmed'
   });
-  const [isLoading, setIsLoading] = useState(true);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [errors, setErrors] = useState<{[key: string]: string}>({});
-  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
+    const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
+    if (token) {
+      const decoded = jwtDecode<JwtPayload>(token);
+      setUserId(decoded.id);
+    }
+
     const fetchTrain = async () => {
       try {
         const response = await fetch(`http://localhost:3000/api/trains/${params.id}`, {
           credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json'
+          }
         });
+
+        if (response.status === 401) {
+          router.push('/login');
+          return;
+        }
 
         if (!response.ok) {
           throw new Error('Failed to fetch train details');
@@ -43,49 +82,66 @@ export default function BookTrain({ params }: { params: { id: string } }) {
 
         const data = await response.json();
         setTrain(data);
-      } catch (error) {
-        console.error('Error fetching train:', error);
-        setErrors({ fetch: 'Failed to load train details' });
+        
+        // Generate seats with class-wise distribution and fares
+        const seats: Seat[] = [];
+        // Generate GENERAL seats (1-8)
+        for (let i = 1; i <= 8; i++) {
+          seats.push({
+            number: `G${i}`,
+            isAvailable: true,
+            class: 'GENERAL',
+            fare: data.fare
+          });
+        }
+        // Generate SLEEPER seats (1-6)
+        for (let i = 1; i <= 6; i++) {
+          seats.push({
+            number: `S${i}`,
+            isAvailable: true,
+            class: 'SLEEPER',
+            fare: data.fare * 1.5
+          });
+        }
+        // Generate AC seats (1-6)
+        for (let i = 1; i <= 6; i++) {
+          seats.push({
+            number: `A${i}`,
+            isAvailable: true,
+            class: 'AC',
+            fare: data.fare * 2
+          });
+        }
+        setAvailableSeats(seats);
+      } catch (err) {
+        setError('Error loading train details');
+        console.error(err);
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
 
     fetchTrain();
-  }, [params.id]);
+  }, [params.id, router]);
 
-  const validateForm = () => {
-    const newErrors: {[key: string]: string} = {};
-
-    if (!formData.passengerName.trim()) {
-      newErrors.passengerName = 'Passenger name is required';
-    }
-
-    if (!formData.passengerAge) {
-      newErrors.passengerAge = 'Passenger age is required';
-    } else if (isNaN(Number(formData.passengerAge)) || Number(formData.passengerAge) < 1 || Number(formData.passengerAge) > 100) {
-      newErrors.passengerAge = 'Please enter a valid age between 1 and 100';
-    }
-
-    if (!formData.seatNumber) {
-      newErrors.seatNumber = 'Seat number is required';
-    } else if (isNaN(Number(formData.seatNumber)) || Number(formData.seatNumber) < 1 || Number(formData.seatNumber) > (train?.totalSeats || 0)) {
-      newErrors.seatNumber = `Please enter a valid seat number between 1 and ${train?.totalSeats}`;
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    
-    if (!validateForm()) {
-      return;
-    }
-
-    setIsSubmitting(true);
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
     try {
+      if (!bookingData.passengerName || bookingData.passengerName.length < 2) {
+        setError('Passenger name must be at least 2 characters long.');
+        return;
+      }
+      if (!bookingData.passengerAge || isNaN(Number(bookingData.passengerAge)) || Number(bookingData.passengerAge) < 1 || Number(bookingData.passengerAge) > 120) {
+        setError('Passenger age must be a number between 1 and 120.');
+        return;
+      }
+      if (!bookingData.seatNumber) {
+        setError('Please select a seat.');
+        return;
+      }
+
+      setError('');
+
       const response = await fetch('http://localhost:3000/api/trains/bookings', {
         method: 'POST',
         headers: {
@@ -94,75 +150,126 @@ export default function BookTrain({ params }: { params: { id: string } }) {
         credentials: 'include',
         body: JSON.stringify({
           trainId: train?.id,
-          passengerName: formData.passengerName,
-          passengerAge: Number(formData.passengerAge),
-          seatNumber: Number(formData.seatNumber),
-          status: 'confirmed'
-        }),
+          userId: userId,
+          passengerName: bookingData.passengerName,
+          passengerAge: parseInt(bookingData.passengerAge),
+          seatNumber: bookingData.seatNumber,
+          class: bookingData.class,
+          bookingDate: bookingData.bookingDate,
+          status: bookingData.status
+        })
       });
-
-      const data = await response.json();
 
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to create booking');
+        throw new Error('Failed to create booking');
       }
 
-      setSuccessMessage('Booking created successfully!');
-      // Clear form
-      setFormData({
-        passengerName: '',
-        passengerAge: '',
-        seatNumber: '',
-      });
-
-      // Redirect to bookings page after 2 seconds
-      setTimeout(() => {
-        router.push('/bookings');
-      }, 2000);
-    } catch (error: any) {
-      setErrors({
-        submit: error.message || 'Failed to create booking'
-      });
-    } finally {
-      setIsSubmitting(false);
+      router.push('/dashboard/bookings');
+    } catch (err) {
+      setError('Error creating booking');
+      console.error(err);
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
+    setBookingData(prev => ({
       ...prev,
       [name]: value
     }));
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+  };
+
+  const handleSeatSelect = (seat: Seat) => {
+    setBookingData(prev => ({
+      ...prev,
+      seatNumber: seat.number,
+      class: seat.class
+    }));
+    setSelectedAmount(seat.fare);
+  };
+
+  const handleClassChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedClass(e.target.value as 'GENERAL' | 'SLEEPER' | 'AC');
+  };
+
+  const handlePayment = async () => {
+    try {
+      // Validate form data first
+      if (!bookingData.passengerName || bookingData.passengerName.length < 2) {
+        setError('Passenger name must be at least 2 characters long.');
+        return;
+      }
+      if (!bookingData.passengerAge || isNaN(Number(bookingData.passengerAge)) || Number(bookingData.passengerAge) < 1 || Number(bookingData.passengerAge) > 120) {
+        setError('Passenger age must be a number between 1 and 120.');
+        return;
+      }
+      if (!bookingData.seatNumber) {
+        setError('Please select a seat.');
+        return;
+      }
+
+      setError('');
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+
+      // Calculate amount based on seat class
+      const baseFare = train?.fare || 0;
+      const fareMultiplier = bookingData.class === 'GENERAL' ? 1 : bookingData.class === 'SLEEPER' ? 1.5 : 2;
+      const amount = Math.round(baseFare * fareMultiplier * 100); // Convert to paise
+
+      const response = await fetch(`${baseUrl}/api/trains/create-payment-intent`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          amount,
+          trainId: params.id,
+          seatNumber: bookingData.seatNumber,
+          seatClass: bookingData.class
+        }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create payment intent');
+      }
+
+      const { clientSecret, amount: confirmedAmount } = await response.json();
+      setClientSecret(clientSecret);
+      setSelectedAmount(confirmedAmount / 100); // Convert back to rupees for display
+      setShowPaymentModal(true);
+    } catch (err: any) {
+      setError(err.message || 'Error processing payment');
+      console.error('Payment Error:', err);
     }
   };
 
-  if (isLoading) {
+  const handlePaymentSuccess = async () => {
+    try {
+      await handleSubmit();
+      setShowPaymentModal(false);
+      router.push('/bookings');
+    } catch (err) {
+      setError('Error completing booking');
+      console.error(err);
+    }
+  };
+
+  const handlePaymentCancel = () => {
+    setShowPaymentModal(false);
+    setClientSecret('');
+  };
+
+  const filteredSeats = availableSeats.filter(seat => seat.class === selectedClass);
+
+  if (loading) {
     return (
       <div>
         <Navbar />
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="flex justify-center items-center h-64">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  if (errors.fetch) {
-    return (
-      <div>
-        <Navbar />
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-          <div className="bg-red-50 border border-red-200 rounded-md p-4">
-            <p className="text-red-600">{errors.fetch}</p>
           </div>
         </div>
       </div>
@@ -189,7 +296,6 @@ export default function BookTrain({ params }: { params: { id: string } }) {
         <div className="max-w-3xl mx-auto">
           <h1 className="text-3xl font-bold text-gray-900 mb-8">Book Train Ticket</h1>
 
-          {/* Train Details */}
           <div className="bg-white rounded-lg shadow-md p-6 mb-8">
             <h2 className="text-xl font-semibold text-gray-900 mb-4">{train.trainName}</h2>
             <div className="grid grid-cols-2 gap-4">
@@ -214,94 +320,151 @@ export default function BookTrain({ params }: { params: { id: string } }) {
                 <p className="font-medium">{train.availableSeats}</p>
               </div>
               <div>
-                <p className="text-gray-600">Fare</p>
+                <p className="text-gray-600">Base Fare</p>
                 <p className="font-medium">₹{train.fare}</p>
               </div>
             </div>
           </div>
 
-          {/* Booking Form */}
-          {successMessage ? (
-            <div className="bg-green-50 border border-green-200 rounded-md p-4">
-              <p className="text-green-600">{successMessage}</p>
-            </div>
-          ) : (
-            <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-8">
-              <div className="space-y-6">
-                <div>
-                  <label htmlFor="passengerName" className="block text-sm font-medium text-gray-700">
-                    Passenger Name
-                  </label>
-                  <input
-                    type="text"
-                    id="passengerName"
-                    name="passengerName"
-                    value={formData.passengerName}
-                    onChange={handleChange}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  />
-                  {errors.passengerName && (
-                    <p className="mt-1 text-sm text-red-600">{errors.passengerName}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label htmlFor="passengerAge" className="block text-sm font-medium text-gray-700">
-                    Passenger Age
-                  </label>
-                  <input
-                    type="number"
-                    id="passengerAge"
-                    name="passengerAge"
-                    value={formData.passengerAge}
-                    onChange={handleChange}
-                    min="1"
-                    max="100"
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  />
-                  {errors.passengerAge && (
-                    <p className="mt-1 text-sm text-red-600">{errors.passengerAge}</p>
-                  )}
-                </div>
-
-                <div>
-                  <label htmlFor="seatNumber" className="block text-sm font-medium text-gray-700">
-                    Seat Number
-                  </label>
-                  <input
-                    type="number"
-                    id="seatNumber"
-                    name="seatNumber"
-                    value={formData.seatNumber}
-                    onChange={handleChange}
-                    min="1"
-                    max={train.totalSeats}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  />
-                  {errors.seatNumber && (
-                    <p className="mt-1 text-sm text-red-600">{errors.seatNumber}</p>
-                  )}
-                </div>
-
-                {errors.submit && (
-                  <div className="rounded-md bg-red-50 p-4">
-                    <p className="text-sm text-red-600">{errors.submit}</p>
-                  </div>
+          <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-8">
+            <div className="space-y-6">
+              <div>
+                <label htmlFor="passengerName" className="block text-sm font-medium text-gray-700">
+                  Passenger Name
+                </label>
+                <input
+                  type="text"
+                  id="passengerName"
+                  name="passengerName"
+                  value={bookingData.passengerName}
+                  onChange={handleChange}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                />
+                {error && bookingData.passengerName.length < 2 && (
+                  <p className="mt-1 text-sm text-red-600">{error}</p>
                 )}
+              </div>
 
-                <button
-                  type="submit"
-                  disabled={isSubmitting}
-                  className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                    isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
+              <div>
+                <label htmlFor="passengerAge" className="block text-sm font-medium text-gray-700">
+                  Passenger Age
+                </label>
+                <input
+                  type="number"
+                  id="passengerAge"
+                  name="passengerAge"
+                  value={bookingData.passengerAge}
+                  onChange={handleChange}
+                  min="1"
+                  max="120"
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                />
+                {error && (isNaN(Number(bookingData.passengerAge)) || Number(bookingData.passengerAge) < 1 || Number(bookingData.passengerAge) > 120) && (
+                  <p className="mt-1 text-sm text-red-600">{error}</p>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="bookingDate" className="block text-sm font-medium text-gray-700">
+                  Booking Date
+                </label>
+                <input
+                  type="date"
+                  id="bookingDate"
+                  name="bookingDate"
+                  value={bookingData.bookingDate}
+                  onChange={handleChange}
+                  min={new Date().toISOString().split('T')[0]}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="classSelection" className="block text-sm font-medium text-gray-700">
+                  Select Class
+                </label>
+                <select
+                  id="classSelection"
+                  value={selectedClass}
+                  onChange={handleClassChange}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                 >
-                  {isSubmitting ? 'Creating Booking...' : 'Confirm Booking'}
+                  <option value="GENERAL">General</option>
+                  <option value="SLEEPER">Sleeper</option>
+                  <option value="AC">AC</option>
+                </select>
+              </div>
+
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold">
+                  {selectedClass} Class - ₹{(train.fare * (selectedClass === 'GENERAL' ? 1 : selectedClass === 'SLEEPER' ? 1.5 : 2)).toFixed(2)}
+                </h3>
+                <div className="grid grid-cols-8 gap-2">
+                  {filteredSeats.map((seat) => (
+                    <button
+                      key={seat.number}
+                      type="button"
+                      onClick={() => handleSeatSelect(seat)}
+                      className={`p-2 rounded-md text-center ${
+                        bookingData.seatNumber === seat.number
+                          ? 'bg-blue-600 text-white'
+                          : seat.isAvailable
+                          ? 'bg-green-100 hover:bg-green-200'
+                          : 'bg-gray-200 cursor-not-allowed'
+                      }`}
+                      disabled={!seat.isAvailable}
+                    >
+                      {seat.number}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {bookingData.seatNumber && (
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex justify-between items-center">
+                    <div>
+                      <p className="font-semibold">Selected Seat: {bookingData.seatNumber}</p>
+                      <p className="text-sm text-gray-600">Class: {bookingData.class}</p>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-sm text-gray-600">Amount:</p>
+                      <p className="font-bold text-lg">₹{selectedAmount}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {error && (
+                <div className="bg-red-50 border border-red-200 rounded-md p-4">
+                  <p className="text-red-600">{error}</p>
+                </div>
+              )}
+
+              <div className="flex justify-between items-center bg-gray-50 p-4 rounded-lg">
+                <div>
+                  <p className="text-sm text-gray-600">Final amount</p>
+                  <p className="font-bold">₹{selectedAmount}</p>
+                </div>
+                <button
+                  type="button"
+                  onClick={handlePayment}
+                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  Proceed to Payment
                 </button>
               </div>
-            </form>
-          )}
+            </div>
+          </form>
         </div>
+        
+        {showPaymentModal && clientSecret && (
+          <PaymentModal
+            clientSecret={clientSecret}
+            onSuccess={handlePaymentSuccess}
+            onCancel={handlePaymentCancel}
+          />
+        )}
       </div>
     </div>
   );

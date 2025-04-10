@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
 import nodemailer from 'nodemailer';
 import { Op } from 'sequelize';
-import jwt from 'jsonwebtoken';
+import jwt, { JwtPayload } from 'jsonwebtoken';
 import User from '../models/user.model';
 import { sendOTPEmail } from '../utils/emailUtils';
 // import { sendOTPEmail } from '../services/otpService';
@@ -277,7 +277,7 @@ export const updateProfile = async (req: Request, res: Response) => {
         });
     } catch (error) {
         console.error('Error updating profile:', error);
-        res.status(500).json({ message: 'Error updating profile', error});
+        res.status(500).json({ message: 'Error updating profile', error });
     }
 };
 
@@ -421,7 +421,7 @@ export const forgotPassword = async (req: Request, res: Response) => {
 
         // Generate OTP
         const otp = Math.floor(100000 + Math.random() * 900000).toString();
-        
+
         // Save OTP and expiration
         user.otp = otp;
         user.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
@@ -504,3 +504,25 @@ export const resetPasswordWithOTP = async (req: Request, res: Response) => {
 };
 
 
+export const checkAuth = (req: Request, res: Response) => {
+    try {
+        const token =
+            req.cookies?.token || req.headers.authorization?.split(' ')[1];
+
+        if (!token) {
+            return res.status(200).json({ authenticated: false });
+        }
+
+        const secret = process.env.JWT_SECRET || 'your-secret-key';
+
+        try {
+            const decoded = jwt.verify(token, secret) as JwtPayload;
+            return res.status(200).json({ authenticated: true });
+        } catch (err) {
+            return res.status(200).json({ authenticated: false });
+        }
+    } catch (error) {
+        console.error('Auth check error:', error);
+        return res.status(200).json({ authenticated: false });
+    }
+};

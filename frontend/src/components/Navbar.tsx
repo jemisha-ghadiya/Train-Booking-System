@@ -15,29 +15,39 @@ const Navbar = () => {
   useEffect(() => {
     const checkLoginStatus = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/auth/check', {
+        const token = Cookies.get('token');
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+        
+        const response = await fetch(`${baseUrl}/api/auth/check-auth`, {
+          method: 'GET',
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
-          },
+            ...(token && { 'Authorization': `Bearer ${token}` })
+          }
         });
 
         if (!response.ok) {
-          throw new Error(`HTTP error! status: ${response.status}`);
+          setIsLoggedIn(false);
+          return;
         }
 
         const data = await response.json();
         setIsLoggedIn(data.authenticated);
+
+        if (!data.authenticated) {
+          Cookies.remove('token');
+        }
       } catch (error) {
         console.error('Error checking auth status:', error);
         setIsLoggedIn(false);
+        Cookies.remove('token');
       }
     };
-
     checkLoginStatus();
+    const interval = setInterval(checkLoginStatus, 5 * 60 * 1000); // Check every 5 minutes
 
-    window.addEventListener('storage', checkLoginStatus);
-    return () => window.removeEventListener('storage', checkLoginStatus);
+    return () => clearInterval(interval);
   }, [pathname]);
 
   useEffect(() => {
