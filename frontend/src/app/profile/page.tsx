@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Navbar from '@/components/Navbar';
 
 export default function Profile() {
@@ -13,11 +13,110 @@ export default function Profile() {
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<{[key: string]: string}>({});
   const [successMessage, setSuccessMessage] = useState('');
+  const [originalData, setOriginalData] = useState({
+    username: '',
+    email: '',
+  });
+
+  useEffect(() => {
+    const fetchUserData = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/api/auth/user', {
+          method: 'GET',
+          credentials: 'include',
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to fetch user data');
+        }
+
+        const userData = {
+          username: data.user.username,
+          email: data.user.email,
+        };
+
+        setFormData(userData);
+        setOriginalData(userData);
+      } catch (error: any) {
+        setErrors({
+          fetch: error.message || 'Failed to fetch user data',
+        });
+      }
+    };
+
+    fetchUserData();
+  }, []);
+
+  const validateField = (name: string, value: string) => {
+    let error = '';
+    
+    switch (name) {
+      case 'username':
+        if (!value.trim()) {
+          error = 'Username is required';
+        } else if (value.trim().length < 7) {
+          error = 'Username must be at least 7 characters long';
+        }
+        break;
+        
+      case 'email':
+        if (!value.trim()) {
+          error = 'Email is required';
+        } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(value)) {
+          error = 'Please enter a valid email address';
+        }
+        break;
+    }
+    
+    return error;
+  };
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const { name, value } = e.target;
+    setFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+
+    // Validate field on change
+    const error = validateField(name, value);
+    setErrors(prev => ({
+      ...prev,
+      [name]: error
+    }));
+  };
+
+  const validateForm = () => {
+    const newErrors: {[key: string]: string} = {};
+    
+    // Username validation
+    if (!formData.username.trim()) {
+      newErrors.username = 'Username is required';
+    } else if (formData.username.trim().length < 7) {
+      newErrors.username = 'Username must be at least 7 characters long';
+    }
+
+    // Email validation
+    if (!formData.email.trim()) {
+      newErrors.email = 'Email is required';
+    } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(formData.email)) {
+      newErrors.email = 'Please enter a valid email address';
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (!validateForm()) {
+      return;
+    }
+
     setIsLoading(true);
-    setErrors({});
     setSuccessMessage('');
 
     try {
@@ -83,19 +182,28 @@ export default function Profile() {
     }
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+  // Update isFormValid to use validateField results
+  const isFormValid = formData.username.trim() !== '' && 
+    formData.email.trim() !== '' && 
+    formData.username !== originalData.username && 
+    formData.email !== originalData.email &&
+    !validateField('username', formData.username) &&
+    !validateField('email', formData.email);
+
+  // Add a helper message when only one field is changed
+  const getUpdateMessage = () => {
+    if (formData.username.trim() !== '' && formData.email.trim() !== '') {
+      if (!errors.username && !errors.email) {  // Only show these messages if there are no validation errors
+        if (formData.username === originalData.username && formData.email !== originalData.email) {
+          return 'Please update your username as well';
+        } else if (formData.email === originalData.email && formData.username !== originalData.username) {
+          return 'Please update your email as well';
+        } else if (formData.username === originalData.username && formData.email === originalData.email) {
+          return 'Please make changes to update your profile';
+        }
+      }
     }
+    return '';
   };
 
   return (
@@ -117,7 +225,7 @@ export default function Profile() {
                 <div className="space-y-6">
                   <div>
                     <label htmlFor="username" className="block text-sm font-medium text-gray-700">
-                      Username
+                      Update Username <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="text"
@@ -125,13 +233,19 @@ export default function Profile() {
                       name="username"
                       value={formData.username}
                       onChange={handleChange}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.username ? 'border-red-300' : 'border-gray-300'
+                      }`}
+                      required
                     />
+                    {errors.username && (
+                      <p className="mt-1 text-sm text-red-600">{errors.username}</p>
+                    )}
                   </div>
 
                   <div>
                     <label htmlFor="email" className="block text-sm font-medium text-gray-700">
-                      Email
+                      Update Email <span className="text-red-500">*</span>
                     </label>
                     <input
                       type="email"
@@ -139,9 +253,21 @@ export default function Profile() {
                       name="email"
                       value={formData.email}
                       onChange={handleChange}
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                      className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                        errors.email ? 'border-red-300' : 'border-gray-300'
+                      }`}
+                      required
                     />
+                    {errors.email && (
+                      <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                    )}
                   </div>
+
+                  {getUpdateMessage() && (
+                    <div className="rounded-md bg-yellow-50 p-4">
+                      <p className="text-sm text-yellow-600">{getUpdateMessage()}</p>
+                    </div>
+                  )}
 
                   {errors.submit && (
                     <div className="rounded-md bg-red-50 p-4">
@@ -151,9 +277,9 @@ export default function Profile() {
 
                   <button
                     type="submit"
-                    disabled={isLoading}
+                    disabled={isLoading || !isFormValid}
                     className={`w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 ${
-                      isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                      isLoading || !isFormValid ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
                   >
                     {isLoading ? 'Updating...' : 'Update Profile'}

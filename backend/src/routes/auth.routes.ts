@@ -1,7 +1,15 @@
 import { Router } from 'express';
-import { updateProfile } from '../controllers/user.controller';
+import { updateProfile, getUserData } from '../controllers/user.controller';
 import { verifyToken } from '../middleware/auth';
-import { registerUser,loginUser,verifyAndUpdateProfile,resetPassword ,logoutUser} from '../controllers/user.controller';
+import { 
+  registerUser,
+  loginUser,
+  verifyAndUpdateProfile,
+  resetPassword,
+  logoutUser,
+  forgotPassword,
+  resetPasswordWithOTP
+} from '../controllers/user.controller';
 import jwt from 'jsonwebtoken';
 
 const router = Router();
@@ -9,6 +17,8 @@ const router = Router();
 // Public routes
 router.post('/register', registerUser);
 router.post('/login', loginUser);
+router.post('/forgot-password', forgotPassword);
+router.post('/reset-password-otp', resetPasswordWithOTP);
 
 // Auth check route (public)
 router.get('/check', (req, res) => {
@@ -30,6 +40,7 @@ router.put('/profile', updateProfile);
 router.post('/profile/verify', verifyAndUpdateProfile);
 router.put('/password',  resetPassword);
 router.post('/logout', logoutUser);
+router.get('/user', getUserData);
 
 // Protected routes (require authentication)
 // router.put('/profile', verifyToken, updateProfile);

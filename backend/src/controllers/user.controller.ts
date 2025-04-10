@@ -376,4 +376,131 @@ export const resetPassword = async (req: Request, res: Response) => {
     }
 };
 
+export const getUserData = async (req: Request, res: Response) => {
+    try {
+        const userId = req.user?.id;
+
+        if (!userId) {
+            return res.status(401).json({ message: 'User not authenticated' });
+        }
+
+        const user = await User.findByPk(userId, {
+            attributes: ['username', 'email']
+        });
+
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.status(200).json({
+            message: 'User data retrieved successfully',
+            user: {
+                username: user.username,
+                email: user.email
+            }
+        });
+    } catch (error) {
+        console.error('Error retrieving user data:', error);
+        res.status(500).json({ message: 'Error retrieving user data', error });
+    }
+};
+
+export const forgotPassword = async (req: Request, res: Response) => {
+    try {
+        const { email } = req.body;
+
+        if (!email) {
+            return res.status(400).json({ message: 'Email is required' });
+        }
+
+        // Find user by email
+        const user = await User.findOne({ where: { email } });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found with this email' });
+        }
+
+        // Generate OTP
+        const otp = Math.floor(100000 + Math.random() * 900000).toString();
+        
+        // Save OTP and expiration
+        user.otp = otp;
+        user.otpExpiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes expiry
+        await user.save();
+
+        // Send OTP email
+        await sendOTPEmail(email, otp);
+
+        res.status(200).json({
+            message: 'Password reset OTP has been sent to your email',
+            email: email
+        });
+
+    } catch (error) {
+        console.error('Forgot password error:', error);
+        res.status(500).json({
+            message: 'Error processing forgot password request',
+            error: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+};
+
+export const resetPasswordWithOTP = async (req: Request, res: Response) => {
+    try {
+        const { email, otp, newPassword } = req.body;
+
+        if (!email || !otp || !newPassword) {
+            return res.status(400).json({
+                message: 'Email, OTP, and new password are required'
+            });
+        }
+
+        // Find user by email
+        const user = await User.findOne({ where: { email } });
+        if (!user) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        // Verify OTP
+        if (!user.otp || user.otp !== otp) {
+            return res.status(400).json({ message: 'Invalid OTP' });
+        }
+
+        // Check OTP expiration
+        if (user.otpExpiresAt && Date.now() > user.otpExpiresAt.getTime()) {
+            user.otp = null;
+            user.otpExpiresAt = null;
+            await user.save();
+            return res.status(400).json({ message: 'OTP has expired' });
+        }
+
+        // Validate new password
+        if (newPassword.length < 6) {
+            return res.status(400).json({
+                message: 'Password must be at least 6 characters long'
+            });
+        }
+
+        // Hash new password
+        const salt = await bcrypt.genSalt(10);
+        const hashedPassword = await bcrypt.hash(newPassword, salt);
+
+        // Update password and clear OTP
+        user.password = hashedPassword;
+        user.otp = null;
+        user.otpExpiresAt = null;
+        await user.save();
+
+        res.status(200).json({
+            message: 'Password has been reset successfully'
+        });
+
+    } catch (error) {
+        console.error('Reset password error:', error);
+        res.status(500).json({
+            message: 'Error resetting password',
+            error: error instanceof Error ? error.message : 'Unknown error'
+        });
+    }
+};
+
 

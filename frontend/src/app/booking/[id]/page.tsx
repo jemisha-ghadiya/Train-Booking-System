@@ -55,6 +55,7 @@ export default function BookingPage() {
   const [selectedAmount, setSelectedAmount] = useState(0);
   const [availableSeats, setAvailableSeats] = useState<Seat[]>([]);
   const [clientSecret, setClientSecret] = useState('');
+  const [selectedClass, setSelectedClass] = useState<'GENERAL' | 'SLEEPER' | 'AC'>('GENERAL');
 
   // Define the state or replace it with the correct variable
   const address = 'Your Address Here'; // Replace with actual address logic
@@ -129,18 +130,18 @@ export default function BookingPage() {
     if (e) e.preventDefault();
     try {
       // Validate passenger details
-    //   if (!bookingData.passengerName || bookingData.passengerName.length < 2) {
-    //     setError('Passenger name must be at least 2 characters long.');
-    //     return;
-    //   }
-    //   if (!bookingData.passengerAge || isNaN(Number(bookingData.passengerAge)) || Number(bookingData.passengerAge) < 1 || Number(bookingData.passengerAge) > 120) {
-    //     setError('Passenger age must be a number between 1 and 120.');
-    //     return;
-    //   }
-    //   if (!bookingData.seatNumber) {
-    //     setError('Please select a seat.');
-    //     return;
-    //   }
+      if (!bookingData.passengerName || bookingData.passengerName.length < 2) {
+        setError('Passenger name must be at least 2 characters long.');
+        return;
+      }
+      if (!bookingData.passengerAge || isNaN(Number(bookingData.passengerAge)) || Number(bookingData.passengerAge) < 1 || Number(bookingData.passengerAge) > 120) {
+        setError('Passenger age must be a number between 1 and 120.');
+        return;
+      }
+      if (!bookingData.seatNumber) {
+        setError('Please select a seat.');
+        return;
+      }
 
       // Clear any previous error
       setError('');
@@ -194,27 +195,28 @@ export default function BookingPage() {
     setSelectedAmount(seat.fare);
   };
 
-  // Filter seats by class
-  const generalSeats = availableSeats.filter(seat => seat.class === 'GENERAL');
-  const sleeperSeats = availableSeats.filter(seat => seat.class === 'SLEEPER');
-  const acSeats = availableSeats.filter(seat => seat.class === 'AC');
+  const handleClassChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSelectedClass(e.target.value as 'GENERAL' | 'SLEEPER' | 'AC');
+  };
+
+  const filteredSeats = availableSeats.filter((seat: Seat) => seat.class === selectedClass);
 
   // Add a function to handle payment
   const handlePayment = async () => {
     try {
       // Validate passenger details first
-      if (!bookingData.passengerName || bookingData.passengerName.length < 2) {
-        setError('Passenger name must be at least 2 characters long.');
-        return;
-      }
-      if (!bookingData.passengerAge || isNaN(Number(bookingData.passengerAge)) || Number(bookingData.passengerAge) < 1 || Number(bookingData.passengerAge) > 120) {
-        setError('Passenger age must be a number between 1 and 120.');
-        return;
-      }
-      if (!bookingData.seatNumber) {
-        setError('Please select a seat.');
-        return;
-      }
+    //   if (!bookingData.passengerName || bookingData.passengerName.length < 2) {
+    //     setError('Passenger name must be at least 2 characters long.');
+    //     return;
+    //   }
+    //   if (!bookingData.passengerAge || isNaN(Number(bookingData.passengerAge)) || Number(bookingData.passengerAge) < 1 || Number(bookingData.passengerAge) > 120) {
+    //     setError('Passenger age must be a number between 1 and 120.');
+    //     return;
+    //   }
+    //   if (!bookingData.seatNumber) {
+    //     setError('Please select a seat.');
+    //     return;
+    //   }
 
       // Clear any previous error
       setError('');
@@ -367,14 +369,13 @@ export default function BookingPage() {
           </div>
 
           <div>
-            <label htmlFor="class" className="block text-sm font-medium text-gray-700">
-              Class
+            <label htmlFor="classSelection" className="block text-sm font-medium text-gray-700">
+              Select Class
             </label>
             <select
-              id="class"
-              name="class"
-              value={bookingData.class}
-              onChange={handleChange}
+              id="classSelection"
+              value={selectedClass}
+              onChange={handleClassChange}
               className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
             >
               <option value="GENERAL">General</option>
@@ -385,73 +386,25 @@ export default function BookingPage() {
 
           {/* Seat Selection Section */}
           <div className="space-y-6">
-            <div>
-              <h3 className="text-lg font-semibold mb-2">General Class - ₹{train.fare}</h3>
-              <div className="grid grid-cols-8 gap-2">
-                {generalSeats.map((seat) => (
-                  <button
-                    key={seat.number}
-                    type="button"
-                    onClick={() => handleSeatSelect(seat)}
-                    className={`p-2 rounded-md text-center ${
-                      bookingData.seatNumber === seat.number
-                        ? 'bg-blue-600 text-white'
-                        : seat.isAvailable
-                        ? 'bg-green-100 hover:bg-green-200'
-                        : 'bg-gray-200 cursor-not-allowed'
-                    }`}
-                    disabled={!seat.isAvailable}
-                  >
-                    {seat.number}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-semibold mb-2">Sleeper Class - ₹{(train.fare * 1.5).toFixed(2)}</h3>
-              <div className="grid grid-cols-8 gap-2">
-                {sleeperSeats.map((seat) => (
-                  <button
-                    key={seat.number}
-                    type="button"
-                    onClick={() => handleSeatSelect(seat)}
-                    className={`p-2 rounded-md text-center ${
-                      bookingData.seatNumber === seat.number
-                        ? 'bg-blue-600 text-white'
-                        : seat.isAvailable
-                        ? 'bg-green-100 hover:bg-green-200'
-                        : 'bg-gray-200 cursor-not-allowed'
-                    }`}
-                    disabled={!seat.isAvailable}
-                  >
-                    {seat.number}
-                  </button>
-                ))}
-              </div>
-            </div>
-
-            <div>
-              <h3 className="text-lg font-semibold mb-2">AC Class - ₹{(train.fare * 2).toFixed(2)}</h3>
-              <div className="grid grid-cols-8 gap-2">
-                {acSeats.map((seat) => (
-                  <button
-                    key={seat.number}
-                    type="button"
-                    onClick={() => handleSeatSelect(seat)}
-                    className={`p-2 rounded-md text-center ${
-                      bookingData.seatNumber === seat.number
-                        ? 'bg-blue-600 text-white'
-                        : seat.isAvailable
-                        ? 'bg-green-100 hover:bg-green-200'
-                        : 'bg-gray-200 cursor-not-allowed'
-                    }`}
-                    disabled={!seat.isAvailable}
-                  >
-                    {seat.number}
-                  </button>
-                ))}
-              </div>
+            <h3 className="text-lg font-semibold mb-2">{selectedClass} Class - ₹{(train.fare * (selectedClass === 'GENERAL' ? 1 : selectedClass === 'SLEEPER' ? 1.5 : 2)).toFixed(2)}</h3>
+            <div className="grid grid-cols-8 gap-2">
+              {filteredSeats.map((seat: Seat) => (
+                <button
+                  key={seat.number}
+                  type="button"
+                  onClick={() => handleSeatSelect(seat)}
+                  className={`p-2 rounded-md text-center ${
+                    bookingData.seatNumber === seat.number
+                      ? 'bg-blue-600 text-white'
+                      : seat.isAvailable
+                      ? 'bg-green-100 hover:bg-green-200'
+                      : 'bg-gray-200 cursor-not-allowed'
+                  }`}
+                  disabled={!seat.isAvailable}
+                >
+                  {seat.number}
+                </button>
+              ))}
             </div>
           </div>
 

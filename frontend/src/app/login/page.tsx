@@ -36,6 +36,7 @@ export default function Login() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           // If input contains @, treat as email, otherwise as username
           ...(formData.usernameOrEmail.includes('@') 
@@ -45,7 +46,6 @@ export default function Login() {
           password: formData.password,
           rememberMe: formData.rememberMe
         }),
-        credentials: 'include'
       });
 
       const data = await response.json();
@@ -168,7 +168,7 @@ export default function Login() {
                 </div>
 
                 <div className="text-sm">
-                  <a href="#" className="font-medium text-blue-600 hover:text-blue-500">
+                  <a href="/forgot-password" className="font-medium text-blue-600 hover:text-blue-500">
                     Forgot your password?
                   </a>
                 </div>
