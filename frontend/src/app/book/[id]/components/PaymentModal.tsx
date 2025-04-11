@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import {
   PaymentElement,
   useStripe,
@@ -25,26 +25,39 @@ function PaymentForm({ clientSecret, onSuccess, onCancel }: PaymentModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
+  
     if (!stripe || !elements) {
       return;
     }
-
+  
     setIsLoading(true);
     setErrorMessage('');
-
+  
     try {
-      const { error } = await stripe.confirmPayment({
+      const { error, paymentIntent } = await stripe.confirmPayment({
         elements,
-        confirmParams: {
-          return_url: `${window.location.origin}/bookings`,
-        },
+        confirmParams: {},
+        redirect: 'if_required',
       });
-
+  
       if (error) {
         setErrorMessage(error.message || 'An error occurred');
-      } else {
-        onSuccess();
+      } else if (paymentIntent) {
+        switch (paymentIntent.status) {
+          case 'succeeded':
+            // Payment completed successfully
+            onSuccess();
+            break;
+          case 'processing':
+            setErrorMessage('Payment is processing. Please wait.');
+            break;
+          case 'requires_payment_method':
+            setErrorMessage('Payment failed. Please try another payment method.');
+            break;
+          default:
+            setErrorMessage('Unexted payment status.');
+            break;
+        }
       }
     } catch (err: any) {
       setErrorMessage(err.message || 'Payment failed');
@@ -52,6 +65,7 @@ function PaymentForm({ clientSecret, onSuccess, onCancel }: PaymentModalProps) {
       setIsLoading(false);
     }
   };
+  
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
@@ -98,4 +112,4 @@ export default function PaymentModal({ clientSecret, onSuccess, onCancel }: Paym
       <PaymentForm clientSecret={clientSecret} onSuccess={onSuccess} onCancel={onCancel} />
     </Elements>
   );
-} 
+}

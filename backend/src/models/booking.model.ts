@@ -13,6 +13,10 @@ class Booking extends Model {
   public class!: string; // New field
   public bookingDate!: Date;
   public status!: 'confirmed' | 'cancelled';
+  
+  // Add association properties
+  public Train?: Train;
+  public User?: User;
 }
 
 Booking.init(
@@ -71,9 +75,5 @@ Booking.init(
     tableName: 'bookings',
   }
 );
-
-// Define associations
-Booking.belongsTo(Train, { foreignKey: 'trainId' });
-Booking.belongsTo(User, { foreignKey: 'userId' });
 
 export default Booking; 

@@ -17,7 +17,7 @@ const Navbar = () => {
       try {
         const token = Cookies.get('token');
         const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-        
+
         const response = await fetch(`${baseUrl}/api/auth/check-auth`, {
           method: 'GET',
           credentials: 'include',
@@ -137,6 +137,13 @@ const Navbar = () => {
                       onClick={() => setIsDropdownOpen(false)}
                     >
                       My Profile
+                    </Link>
+                    <Link
+                      href="/my-bookings"
+                      className="block px-4 py-2 text-sm hover:bg-gray-100"
+                      onClick={() => setIsDropdownOpen(false)}
+                    >
+                      My Bookings
                     </Link>
                     <Link
                       href="/change-password"

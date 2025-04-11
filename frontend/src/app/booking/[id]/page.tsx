@@ -234,6 +234,17 @@ export default function BookingPage() {
       // Clear any previous error
       setError('');
 
+      // Check if there's already a payment intent in the URL
+      const urlParams = new URLSearchParams(window.location.search);
+      const existingClientSecret = urlParams.get("payment_intent_client_secret");
+      
+      if (existingClientSecret) {
+        // If there's an existing payment intent, use it
+        setClientSecret(existingClientSecret);
+        setShowPaymentModal(true);
+        return;
+      }
+
       // Create a payment intent on the server
       const response = await fetch('http://localhost:3000/api/trains/create-payment-intent', {
         method: 'POST',
@@ -247,10 +258,16 @@ export default function BookingPage() {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create payment intent');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create payment intent');
       }
 
       const { clientSecret } = await response.json();
+      
+      if (!clientSecret) {
+        throw new Error('No client secret received from server');
+      }
+      
       setClientSecret(clientSecret);
       setShowPaymentModal(true); // Show the payment modal
     } catch (err: any) {
@@ -261,6 +278,10 @@ export default function BookingPage() {
 
   const handlePaymentSuccess = async () => {
     try {
+      // Check if we already have a booking for this payment
+      const urlParams = new URLSearchParams(window.location.search);
+      const paymentIntentId = urlParams.get("payment_intent");
+      
       // First create the booking
       const response = await fetch('http://localhost:3000/api/trains/bookings', {
         method: 'POST',
@@ -276,32 +297,33 @@ export default function BookingPage() {
           seatNumber: bookingData.seatNumber,
           class: bookingData.class,
           bookingDate: bookingData.bookingDate,
-          status: bookingData.status
+          status: 'confirmed',
+          paymentIntentId: paymentIntentId || null
         })
       });
-
+  
       if (!response.ok) {
-        throw new Error('Failed to create booking');
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to create booking');
       }
-
+  
       const createdBooking: BookingResponse = await response.json();
-      
+  
       // Close the payment modal
       setShowPaymentModal(false);
-      
+  
       // Show success message
       alert('Booking created successfully!');
-      
-      // Redirect to the bookings page with a small delay to ensure the booking is saved
-      setTimeout(() => {
-        router.push('/dashboard/bookings');
-      }, 1000);
+  
+      // Redirect to the booking details page using trainId
+      router.push(`/booking/${trainId}`);
     } catch (err) {
       console.error('Error creating booking:', err);
       setError('Failed to create booking after payment');
       setShowPaymentModal(false);
     }
   };
+  
 
   const handleClosePaymentModal = () => {
     setShowPaymentModal(false);

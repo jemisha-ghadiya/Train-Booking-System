@@ -46,6 +46,7 @@ export default function BookTrain({ params }: { params: { id: string } }) {
   const [selectedClass, setSelectedClass] = useState<'GENERAL' | 'SLEEPER' | 'AC'>('GENERAL');
   const [clientSecret, setClientSecret] = useState('');
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [isProcessingPayment, setIsProcessingPayment] = useState(false);
   const [bookingData, setBookingData] = useState({
     passengerName: '',
     passengerAge: '',
@@ -54,6 +55,7 @@ export default function BookTrain({ params }: { params: { id: string } }) {
     bookingDate: new Date().toISOString().split('T')[0],
     status: 'confirmed'
   });
+  const [successMessage, setSuccessMessage] = useState('');
 
   useEffect(() => {
     const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
@@ -72,7 +74,7 @@ export default function BookTrain({ params }: { params: { id: string } }) {
         });
 
         if (response.status === 401) {
-          router.push('/login');
+          // router.push('/login');
           return;
         }
 
@@ -124,6 +126,30 @@ export default function BookTrain({ params }: { params: { id: string } }) {
     fetchTrain();
   }, [params.id, router]);
 
+  useEffect(() => {
+    // Handle Stripe redirect and verify payment
+    const verifyPayment = async () => {
+      const searchParams = new URLSearchParams(window.location.search);
+      const paymentIntent = searchParams.get('payment_intent');
+      const redirectStatus = searchParams.get('redirect_status');
+
+      if (paymentIntent && redirectStatus === 'succeeded') {
+        setIsProcessingPayment(true);
+        try {
+          await handleSubmit();
+          router.push('/dashboard/bookings');
+        } catch (err) {
+          setError('Error completing booking after payment');
+          console.error(err);
+        } finally {
+          setIsProcessingPayment(false);
+        }
+      }
+    };
+
+    verifyPayment();
+  }, []);
+
   const handleSubmit = async (e?: React.FormEvent) => {
     if (e) e.preventDefault();
     try {
@@ -163,8 +189,6 @@ export default function BookTrain({ params }: { params: { id: string } }) {
       if (!response.ok) {
         throw new Error('Failed to create booking');
       }
-
-      router.push('/dashboard/bookings');
     } catch (err) {
       setError('Error creating booking');
       console.error(err);
@@ -216,6 +240,12 @@ export default function BookTrain({ params }: { params: { id: string } }) {
       const fareMultiplier = bookingData.class === 'GENERAL' ? 1 : bookingData.class === 'SLEEPER' ? 1.5 : 2;
       const amount = Math.round(baseFare * fareMultiplier * 100); // Convert to paise
 
+      // Validate that amount is a valid number
+      if (isNaN(amount) || amount <= 0) {
+        setError('Invalid fare calculation. Please try again.');
+        return;
+      }
+
       const response = await fetch(`${baseUrl}/api/trains/create-payment-intent`, {
         method: 'POST',
         headers: {
@@ -237,7 +267,11 @@ export default function BookTrain({ params }: { params: { id: string } }) {
 
       const { clientSecret, amount: confirmedAmount } = await response.json();
       setClientSecret(clientSecret);
-      setSelectedAmount(confirmedAmount / 100); // Convert back to rupees for display
+      
+      // Ensure confirmedAmount is a valid number before setting it
+      const displayAmount = confirmedAmount && !isNaN(confirmedAmount) ? confirmedAmount / 100 : selectedAmount;
+      setSelectedAmount(displayAmount);
+      
       setShowPaymentModal(true);
     } catch (err: any) {
       setError(err.message || 'Error processing payment');
@@ -249,7 +283,13 @@ export default function BookTrain({ params }: { params: { id: string } }) {
     try {
       await handleSubmit();
       setShowPaymentModal(false);
-      router.push('/bookings');
+      setSuccessMessage('Payment successful! ');
+      // Add a delay before redirecting to show the success message
+      
+      // Auto-hide the success message after 3 seconds
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
     } catch (err) {
       setError('Error completing booking');
       console.error(err);
@@ -293,170 +333,182 @@ export default function BookTrain({ params }: { params: { id: string } }) {
     <div>
       <Navbar />
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="max-w-3xl mx-auto">
-          <h1 className="text-3xl font-bold text-gray-900 mb-8">Book Train Ticket</h1>
-
-          <div className="bg-white rounded-lg shadow-md p-6 mb-8">
-            <h2 className="text-xl font-semibold text-gray-900 mb-4">{train.trainName}</h2>
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <p className="text-gray-600">Train Number</p>
-                <p className="font-medium">{train.trainNumber}</p>
-              </div>
-              <div>
-                <p className="text-gray-600">Route</p>
-                <p className="font-medium">{train.source} → {train.destination}</p>
-              </div>
-              <div>
-                <p className="text-gray-600">Departure</p>
-                <p className="font-medium">{new Date(train.departureTime).toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-gray-600">Arrival</p>
-                <p className="font-medium">{new Date(train.arrivalTime).toLocaleString()}</p>
-              </div>
-              <div>
-                <p className="text-gray-600">Available Seats</p>
-                <p className="font-medium">{train.availableSeats}</p>
-              </div>
-              <div>
-                <p className="text-gray-600">Base Fare</p>
-                <p className="font-medium">₹{train.fare}</p>
-              </div>
-            </div>
+        {successMessage && (
+          <div className="fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded z-50">
+            {successMessage}
           </div>
+        )}
+        {isProcessingPayment ? (
+          <div className="flex justify-center items-center h-64">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+            <p className="ml-4">Processing your payment...</p>
+          </div>
+        ) : (
+          <div className="max-w-3xl mx-auto">
+            <h1 className="text-3xl font-bold text-gray-900 mb-8">Book Train Ticket</h1>
 
-          <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-8">
-            <div className="space-y-6">
-              <div>
-                <label htmlFor="passengerName" className="block text-sm font-medium text-gray-700">
-                  Passenger Name
-                </label>
-                <input
-                  type="text"
-                  id="passengerName"
-                  name="passengerName"
-                  value={bookingData.passengerName}
-                  onChange={handleChange}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-                {error && bookingData.passengerName.length < 2 && (
-                  <p className="mt-1 text-sm text-red-600">{error}</p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="passengerAge" className="block text-sm font-medium text-gray-700">
-                  Passenger Age
-                </label>
-                <input
-                  type="number"
-                  id="passengerAge"
-                  name="passengerAge"
-                  value={bookingData.passengerAge}
-                  onChange={handleChange}
-                  min="1"
-                  max="120"
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-                {error && (isNaN(Number(bookingData.passengerAge)) || Number(bookingData.passengerAge) < 1 || Number(bookingData.passengerAge) > 120) && (
-                  <p className="mt-1 text-sm text-red-600">{error}</p>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="bookingDate" className="block text-sm font-medium text-gray-700">
-                  Booking Date
-                </label>
-                <input
-                  type="date"
-                  id="bookingDate"
-                  name="bookingDate"
-                  value={bookingData.bookingDate}
-                  onChange={handleChange}
-                  min={new Date().toISOString().split('T')[0]}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                />
-              </div>
-
-              <div>
-                <label htmlFor="classSelection" className="block text-sm font-medium text-gray-700">
-                  Select Class
-                </label>
-                <select
-                  id="classSelection"
-                  value={selectedClass}
-                  onChange={handleClassChange}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                >
-                  <option value="GENERAL">General</option>
-                  <option value="SLEEPER">Sleeper</option>
-                  <option value="AC">AC</option>
-                </select>
-              </div>
-
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">
-                  {selectedClass} Class - ₹{(train.fare * (selectedClass === 'GENERAL' ? 1 : selectedClass === 'SLEEPER' ? 1.5 : 2)).toFixed(2)}
-                </h3>
-                <div className="grid grid-cols-8 gap-2">
-                  {filteredSeats.map((seat) => (
-                    <button
-                      key={seat.number}
-                      type="button"
-                      onClick={() => handleSeatSelect(seat)}
-                      className={`p-2 rounded-md text-center ${
-                        bookingData.seatNumber === seat.number
-                          ? 'bg-blue-600 text-white'
-                          : seat.isAvailable
-                          ? 'bg-green-100 hover:bg-green-200'
-                          : 'bg-gray-200 cursor-not-allowed'
-                      }`}
-                      disabled={!seat.isAvailable}
-                    >
-                      {seat.number}
-                    </button>
-                  ))}
+            <div className="bg-white rounded-lg shadow-md p-6 mb-8">
+              <h2 className="text-xl font-semibold text-gray-900 mb-4">{train.trainName}</h2>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <p className="text-gray-600">Train Number</p>
+                  <p className="font-medium">{train.trainNumber}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Route</p>
+                  <p className="font-medium">{train.source} → {train.destination}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Departure</p>
+                  <p className="font-medium">{new Date(train.departureTime).toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Arrival</p>
+                  <p className="font-medium">{new Date(train.arrivalTime).toLocaleString()}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Available Seats</p>
+                  <p className="font-medium">{train.availableSeats}</p>
+                </div>
+                <div>
+                  <p className="text-gray-600">Base Fare</p>
+                  <p className="font-medium">₹{train.fare}</p>
                 </div>
               </div>
+            </div>
 
-              {bookingData.seatNumber && (
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex justify-between items-center">
-                    <div>
-                      <p className="font-semibold">Selected Seat: {bookingData.seatNumber}</p>
-                      <p className="text-sm text-gray-600">Class: {bookingData.class}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-sm text-gray-600">Amount:</p>
-                      <p className="font-bold text-lg">₹{selectedAmount}</p>
-                    </div>
+            <form onSubmit={handleSubmit} className="bg-white shadow rounded-lg p-8">
+              <div className="space-y-6">
+                <div>
+                  <label htmlFor="passengerName" className="block text-sm font-medium text-gray-700">
+                    Passenger Name
+                  </label>
+                  <input
+                    type="text"
+                    id="passengerName"
+                    name="passengerName"
+                    value={bookingData.passengerName}
+                    onChange={handleChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  />
+                  {error && bookingData.passengerName.length < 2 && (
+                    <p className="mt-1 text-sm text-red-600">{error}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label htmlFor="passengerAge" className="block text-sm font-medium text-gray-700">
+                    Passenger Age
+                  </label>
+                  <input
+                    type="number"
+                    id="passengerAge"
+                    name="passengerAge"
+                    value={bookingData.passengerAge}
+                    onChange={handleChange}
+                    min="1"
+                    max="120"
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  />
+                  {error && (isNaN(Number(bookingData.passengerAge)) || Number(bookingData.passengerAge) < 1 || Number(bookingData.passengerAge) > 120) && (
+                    <p className="mt-1 text-sm text-red-600">{error}</p>
+                  )}
+                </div>
+
+                <div>
+                  <label htmlFor="bookingDate" className="block text-sm font-medium text-gray-700">
+                    Booking Date
+                  </label>
+                  <input
+                    type="date"
+                    id="bookingDate"
+                    name="bookingDate"
+                    value={bookingData.bookingDate}
+                    onChange={handleChange}
+                    min={new Date().toISOString().split('T')[0]}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  />
+                </div>
+
+                <div>
+                  <label htmlFor="classSelection" className="block text-sm font-medium text-gray-700">
+                    Select Class
+                  </label>
+                  <select
+                    id="classSelection"
+                    value={selectedClass}
+                    onChange={handleClassChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  >
+                    <option value="GENERAL">General</option>
+                    <option value="SLEEPER">Sleeper</option>
+                    <option value="AC">AC</option>
+                  </select>
+                </div>
+
+                <div className="space-y-4">
+                  <h3 className="text-lg font-semibold">
+                    {selectedClass} Class - ₹{(train.fare * (selectedClass === 'GENERAL' ? 1 : selectedClass === 'SLEEPER' ? 1.5 : 2)).toFixed(2)}
+                  </h3>
+                  <div className="grid grid-cols-8 gap-2">
+                    {filteredSeats.map((seat) => (
+                      <button
+                        key={seat.number}
+                        type="button"
+                        onClick={() => handleSeatSelect(seat)}
+                        className={`p-2 rounded-md text-center ${
+                          bookingData.seatNumber === seat.number
+                            ? 'bg-blue-600 text-white'
+                            : seat.isAvailable
+                            ? 'bg-green-100 hover:bg-green-200'
+                            : 'bg-gray-200 cursor-not-allowed'
+                        }`}
+                        disabled={!seat.isAvailable}
+                      >
+                        {seat.number}
+                      </button>
+                    ))}
                   </div>
                 </div>
-              )}
 
-              {error && (
-                <div className="bg-red-50 border border-red-200 rounded-md p-4">
-                  <p className="text-red-600">{error}</p>
-                </div>
-              )}
+                {bookingData.seatNumber && (
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <div className="flex justify-between items-center">
+                      <div>
+                        <p className="font-semibold">Selected Seat: {bookingData.seatNumber}</p>
+                        <p className="text-sm text-gray-600">Class: {bookingData.class}</p>
+                      </div>
+                      <div className="text-right">
+                        <p className="text-sm text-gray-600">Amount:</p>
+                        <p className="font-bold text-lg">₹{selectedAmount}</p>
+                      </div>
+                    </div>
+                  </div>
+                )}
 
-              <div className="flex justify-between items-center bg-gray-50 p-4 rounded-lg">
-                <div>
-                  <p className="text-sm text-gray-600">Final amount</p>
-                  <p className="font-bold">₹{selectedAmount}</p>
+                {error && (
+                  <div className="bg-red-50 border border-red-200 rounded-md p-4">
+                    <p className="text-red-600">{error}</p>
+                  </div>
+                )}
+
+                <div className="flex justify-between items-center bg-gray-50 p-4 rounded-lg">
+                  <div>
+                    <p className="text-sm text-gray-600">Final amount</p>
+                    <p className="font-bold">₹{selectedAmount}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handlePayment}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                  >
+                    Proceed to Payment
+                  </button>
                 </div>
-                <button
-                  type="button"
-                  onClick={handlePayment}
-                  className="bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-6 rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                >
-                  Proceed to Payment
-                </button>
               </div>
-            </div>
-          </form>
-        </div>
+            </form>
+          </div>
+        )}
         
         {showPaymentModal && clientSecret && (
           <PaymentModal

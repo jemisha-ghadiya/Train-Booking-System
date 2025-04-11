@@ -5,6 +5,8 @@ import cookieParser from 'cookie-parser';
 import db from './config/database';
 import routes from './routes';
 import authRoutes from './routes/auth.routes';
+// Import models to ensure associations are initialized
+import './models/index';
 
 dotenv.config();
 
@@ -16,11 +18,21 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'Cookie'],
-  exposedHeaders: ['set-cookie']
+  exposedHeaders: ['Set-Cookie']
 }));
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(cookieParser());
+
+// Add a middleware to check token in Authorization header
+app.use((req, res, next) => {
+  const authHeader = req.headers.authorization;
+  if (authHeader && authHeader.startsWith('Bearer ')) {
+    const token = authHeader.split(' ')[1];
+    req.cookies.token = token;
+  }
+  next();
+});
 
 // Database connection
 db.authenticate()

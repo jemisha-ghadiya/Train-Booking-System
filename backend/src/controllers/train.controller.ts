@@ -252,20 +252,48 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
 // Get user's bookings
 export const getUserBookings = async (req: Request, res: Response) => {
   try {
+    console.log('User from request:', req.user);
     const userId = req.user?.id;
 
     if (!userId) {
+      console.log('No user ID found in request');
       return res.status(401).json({ message: 'User not authenticated' });
     }
 
+    console.log('Fetching bookings for user ID:', userId);
+    
+    // First, get all bookings for the user
     const bookings = await Booking.findAll({
       where: { userId },
-      include: [Train]
+      include: [
+        {
+          model: Train,
+          required: false // Use LEFT JOIN to include bookings even if train is not found
+        }
+      ]
     });
 
+    console.log(`Found ${bookings.length} bookings for user ${userId}`);
     res.status(200).json(bookings);
   } catch (error) {
-    res.status(500).json({ message: 'Error fetching bookings', error });
+    console.error('Error in getUserBookings:', error);
+    
+    // Provide more detailed error information
+    if (error instanceof Error) {
+      return res.status(500).json({ 
+        message: 'Error fetching bookings', 
+        error: {
+          name: error.name,
+          message: error.message,
+          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+        }
+      });
+    } else {
+      return res.status(500).json({ 
+        message: 'Error fetching bookings', 
+        error: 'Unknown error occurred'
+      });
+    }
   }
 };
 
@@ -393,33 +421,43 @@ export const deleteTrain = async (req: Request, res: Response) => {
 // Create a payment intent
 export const createPaymentIntent = async (req: Request, res: Response) => {
   try {
-    const { amount } = req.body;
+    const { amount, bookingId } = req.body;
 
-    if (!amount || isNaN(amount) || amount <= 0) {
+    // Validate amount
+    if (!amount || typeof amount !== 'number' || amount <= 0) {
       return res.status(400).json({
         message: 'Invalid amount. Please provide a valid positive number.',
       });
     }
 
-    // Convert to integer and ensure it's a valid amount
-    const amountInPaise = Math.round(Number(amount));
+    // Convert to smallest currency unit (paise)
+    const amountInPaise = Math.round(amount);
 
+    // Create payment intent
     const paymentIntent = await stripe.paymentIntents.create({
       amount: amountInPaise,
       currency: 'inr',
       automatic_payment_methods: {
         enabled: true,
       },
+      metadata: {
+        bookingId: bookingId || 'pending',
+        userId: req.user?.id || 'unknown'
+      }
     });
 
+    // Return the client secret to the frontend
     res.status(200).json({
       clientSecret: paymentIntent.client_secret,
+      message: 'PaymentIntent created successfully',
+      paymentIntentId: paymentIntent.id
     });
+
   } catch (error: any) {
-    console.error('Error creating payment intent:', error?.message);
-    res.status(500).json({ 
-      message: 'Error creating payment intent',
-      error: error?.message 
+    console.error('Stripe error:', error.message);
+    res.status(500).json({
+      message: 'Failed to create PaymentIntent',
+      error: error.message,
     });
   }
 };
