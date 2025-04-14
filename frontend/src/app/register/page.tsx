@@ -28,6 +28,8 @@ export default function Register() {
     // Email validation
     if (!formData.email) {
       newErrors.email = 'Email is required';
+    } else if (/\s/.test(formData.email)) {
+      newErrors.email = 'Email address cannot contain spaces';
     } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
       newErrors.email = 'Invalid email format';
     }
@@ -88,10 +90,21 @@ export default function Register() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    setFormData(prev => ({
-      ...prev,
-      [name]: value
-    }));
+    
+    // Special handling for email field to prevent spaces
+    if (name === 'email') {
+      const emailWithoutSpaces = value.replace(/\s/g, '');
+      setFormData(prev => ({
+        ...prev,
+        [name]: emailWithoutSpaces
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        [name]: value
+      }));
+    }
+    
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
@@ -132,7 +145,9 @@ export default function Register() {
                     required
                     value={formData.username}
                     onChange={handleChange}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className={`appearance-none block w-full px-3 py-2 border ${
+                      errors.username ? 'border-red-300' : 'border-gray-300'
+                    } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
                   />
                   {errors.username && (
                     <p className="mt-1 text-sm text-red-600">{errors.username}</p>
@@ -153,7 +168,9 @@ export default function Register() {
                     required
                     value={formData.email}
                     onChange={handleChange}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className={`appearance-none block w-full px-3 py-2 border ${
+                      errors.email ? 'border-red-300' : 'border-gray-300'
+                    } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
                   />
                   {errors.email && (
                     <p className="mt-1 text-sm text-red-600">{errors.email}</p>
@@ -173,7 +190,9 @@ export default function Register() {
                     required
                     value={formData.password}
                     onChange={handleChange}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className={`appearance-none block w-full px-3 py-2 border ${
+                      errors.password ? 'border-red-300' : 'border-gray-300'
+                    } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
                   />
                   {errors.password && (
                     <p className="mt-1 text-sm text-red-600">{errors.password}</p>
@@ -193,7 +212,9 @@ export default function Register() {
                     required
                     value={formData.confirmPassword}
                     onChange={handleChange}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className={`appearance-none block w-full px-3 py-2 border ${
+                      errors.confirmPassword ? 'border-red-300' : 'border-gray-300'
+                    } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
                   />
                   {errors.confirmPassword && (
                     <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>

@@ -91,18 +91,21 @@ export default function Profile() {
   const validateForm = () => {
     const newErrors: {[key: string]: string} = {};
     
-    // Username validation
-    if (!formData.username.trim()) {
-      newErrors.username = 'Username is required';
-    } else if (formData.username.trim().length < 7) {
-      newErrors.username = 'Username must be at least 7 characters long';
+    // Only validate fields that have been changed
+    if (formData.username !== originalData.username) {
+      if (!formData.username.trim()) {
+        newErrors.username = 'Username is required';
+      } else if (formData.username.trim().length < 7) {
+        newErrors.username = 'Username must be at least 7 characters long';
+      }
     }
 
-    // Email validation
-    if (!formData.email.trim()) {
-      newErrors.email = 'Email is required';
-    } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(formData.email)) {
-      newErrors.email = 'Please enter a valid email address';
+    if (formData.email !== originalData.email) {
+      if (!formData.email.trim()) {
+        newErrors.email = 'Email is required';
+      } else if (!/^[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}$/i.test(formData.email)) {
+        newErrors.email = 'Please enter a valid email address';
+      }
     }
 
     setErrors(newErrors);
@@ -119,6 +122,21 @@ export default function Profile() {
     setIsLoading(true);
     setSuccessMessage('');
 
+    // Only include changed fields in the request
+    const changedData = {
+      ...(formData.username !== originalData.username && { username: formData.username }),
+      ...(formData.email !== originalData.email && { email: formData.email })
+    };
+
+    // Check if any fields were actually changed
+    if (Object.keys(changedData).length === 0) {
+      setErrors({
+        submit: 'No changes were made to update'
+      });
+      setIsLoading(false);
+      return;
+    }
+
     try {
       const response = await fetch('http://localhost:3000/api/auth/profile', {
         method: 'PUT',
@@ -126,7 +144,7 @@ export default function Profile() {
           'Content-Type': 'application/json',
         },
         credentials: 'include',
-        body: JSON.stringify(formData),
+        body: JSON.stringify(changedData),
       });
 
       const data = await response.json();
@@ -182,29 +200,9 @@ export default function Profile() {
     }
   };
 
-  // Update isFormValid to use validateField results
-  const isFormValid = formData.username.trim() !== '' && 
-    formData.email.trim() !== '' && 
-    formData.username !== originalData.username && 
-    formData.email !== originalData.email &&
-    !validateField('username', formData.username) &&
-    !validateField('email', formData.email);
-
-  // Add a helper message when only one field is changed
-  const getUpdateMessage = () => {
-    if (formData.username.trim() !== '' && formData.email.trim() !== '') {
-      if (!errors.username && !errors.email) {  // Only show these messages if there are no validation errors
-        if (formData.username === originalData.username && formData.email !== originalData.email) {
-          return 'Please update your username as well';
-        } else if (formData.email === originalData.email && formData.username !== originalData.username) {
-          return 'Please update your email as well';
-        } else if (formData.username === originalData.username && formData.email === originalData.email) {
-          return 'Please make changes to update your profile';
-        }
-      }
-    }
-    return '';
-  };
+  // Update isFormValid to check for any changes
+  const isFormValid = (formData.username !== originalData.username || formData.email !== originalData.email) &&
+    !errors.username && !errors.email;
 
   return (
     <div>
@@ -262,12 +260,6 @@ export default function Profile() {
                       <p className="mt-1 text-sm text-red-600">{errors.email}</p>
                     )}
                   </div>
-
-                  {getUpdateMessage() && (
-                    <div className="rounded-md bg-yellow-50 p-4">
-                      <p className="text-sm text-yellow-600">{getUpdateMessage()}</p>
-                    </div>
-                  )}
 
                   {errors.submit && (
                     <div className="rounded-md bg-red-50 p-4">

@@ -32,6 +32,17 @@ export default function Home() {
 
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault();
+    
+    // Validate date
+    const selectedDate = new Date(searchParams.date);
+    const today = new Date();
+    today.setHours(0, 0, 0, 0); // Reset time part for accurate date comparison
+    
+    if (selectedDate < today) {
+      setSearchMessage('Please select a current or future date');
+      return;
+    }
+
     try {
       const response = await fetch('http://localhost:3000/api/trains/search', {
         method: 'POST',
@@ -151,6 +162,7 @@ export default function Home() {
                       name="date"
                       value={searchParams.date}
                       onChange={handleInputChange}
+                      min={new Date().toISOString().split('T')[0]}
                       className="mt-1 block w-full pl-10 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                     />
                     <i className="fas fa-calendar-alt absolute left-3 top-3 text-gray-400"></i>
