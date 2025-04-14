@@ -54,6 +54,7 @@ export default function BookingPage() {
   const [train, setTrain] = useState<Train | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [successMessage, setSuccessMessage] = useState('');
   const [userId, setUserId] = useState<number | null>(null);
   const [bookingData, setBookingData] = useState({
     passengerName: '',
@@ -62,6 +63,12 @@ export default function BookingPage() {
     class: 'GENERAL',
     bookingDate: new Date().toISOString().split('T')[0],
     status: 'confirmed'
+  });
+  const [fieldErrors, setFieldErrors] = useState({
+    passengerName: '',
+    passengerAge: '',
+    seatNumber: '',
+    bookingDate: ''
   });
 
   const [selectedAmount, setSelectedAmount] = useState(0);
@@ -74,29 +81,40 @@ export default function BookingPage() {
   const address = 'Your Address Here'; // Replace with actual address logic
 
   useEffect(() => {
-    const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
-    if (token) {
-      const decoded = jwtDecode<JwtPayload>(token);
-      setUserId(decoded.id);
-    }
-
-    const fetchTrain = async () => {
+    const checkAuth = async () => {
       try {
-        const response = await fetch(`http://localhost:3000/api/trains/${trainId}`, {
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+        const response = await fetch(`${baseUrl}/api/auth/check-auth`, {
+          method: 'GET',
+          credentials: 'include',
+        });
+
+        const data = await response.json();
+
+        if (!data.authenticated) {
+          router.push(`/login?returnUrl=/booking/${trainId}`);
+          return;
+        }
+
+        // If authenticated, proceed with fetching train details
+        const token = document.cookie.split('; ').find(row => row.startsWith('token='))?.split('=')[1];
+        if (token) {
+          const decoded = jwtDecode<JwtPayload>(token);
+          setUserId(decoded.id);
+        }
+
+        const trainResponse = await fetch(`${baseUrl}/api/trains/${trainId}`, {
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json'
           }
         });
-        if (response.status === 401) {
-          router.push('/login');
-          return;
-        }
-        if (!response.ok) {
+
+        if (!trainResponse.ok) {
           throw new Error('Failed to fetch train details');
         }
-        const data = await response.json();
-        setTrain(data);
+        const trainData = await trainResponse.json();
+        setTrain(trainData);
         
         // Generate seats with class-wise distribution and fares
         const seats: Seat[] = [];
@@ -106,7 +124,7 @@ export default function BookingPage() {
             number: `G${i}`,
             isAvailable: true,
             class: 'GENERAL',
-            fare: data.fare
+            fare: trainData.fare
           });
         }
         // Generate SLEEPER seats (1-6)
@@ -115,7 +133,7 @@ export default function BookingPage() {
             number: `S${i}`,
             isAvailable: true,
             class: 'SLEEPER',
-            fare: data.fare * 1.5
+            fare: trainData.fare * 1.5
           });
         }
         // Generate AC seats (1-6)
@@ -124,7 +142,7 @@ export default function BookingPage() {
             number: `A${i}`,
             isAvailable: true,
             class: 'AC',
-            fare: data.fare * 2
+            fare: trainData.fare * 2
           });
         }
         setAvailableSeats(seats);
@@ -136,7 +154,7 @@ export default function BookingPage() {
       }
     };
 
-    fetchTrain();
+    checkAuth();
   }, [trainId, router]);
 
   const handleSubmit = async (e?: React.FormEvent) => {
@@ -182,7 +200,7 @@ export default function BookingPage() {
       }
 
       const data = await response.json();
-      alert('Booking created successfully!');
+      // alert('Booking created successfully!');
       // Redirect to a confirmation page or show success message
     //   router.push(`/booking/confirmation/${data.booking.id}`);
     } catch (err) {
@@ -191,11 +209,42 @@ export default function BookingPage() {
     }
   };
 
+  const validateField = (name: string, value: string) => {
+    switch (name) {
+      case 'passengerName':
+        if (!value) return 'Passenger name is required';
+        if (value.length < 2) return 'Name must be at least 2 characters long';
+        return '';
+      case 'passengerAge':
+        if (!value) return 'Age is required';
+        const age = Number(value);
+        if (isNaN(age)) return 'Age must be a number';
+        if (age < 1 || age > 120) return 'Age must be between 1 and 120';
+        return '';
+      case 'bookingDate':
+        if (!value) return 'Booking date is required';
+        const selectedDate = new Date(value);
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        if (selectedDate < today) return 'Booking date cannot be in the past';
+        return '';
+      default:
+        return '';
+    }
+  };
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setBookingData(prev => ({
       ...prev,
       [name]: value
+    }));
+    
+    // Validate field and update error state
+    const errorMessage = validateField(name, value);
+    setFieldErrors(prev => ({
+      ...prev,
+      [name]: errorMessage
     }));
   };
 
@@ -217,6 +266,9 @@ export default function BookingPage() {
   // Update the handlePayment function
   const handlePayment = async () => {
     try {
+      // Clear any previous error
+      setError('');
+
       // Validate passenger details first
       if (!bookingData.passengerName || bookingData.passengerName.length < 2) {
         setError('Passenger name must be at least 2 characters long.');
@@ -231,8 +283,21 @@ export default function BookingPage() {
         return;
       }
 
-      // Clear any previous error
-      setError('');
+      // Validate booking date
+      const selectedDate = new Date(bookingData.bookingDate);
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      
+      if (selectedDate < today) {
+        setError('Booking date cannot be in the past.');
+        return;
+      }
+
+      // Validate train availability
+      if (!train || train.availableSeats <= 0) {
+        setError('No seats available for this train.');
+        return;
+      }
 
       // Check if there's already a payment intent in the URL
       const urlParams = new URLSearchParams(window.location.search);
@@ -309,17 +374,41 @@ export default function BookingPage() {
   
       const createdBooking: BookingResponse = await response.json();
   
-      // Close the payment modal
+      // Close the payment modal immediately
       setShowPaymentModal(false);
+      setClientSecret('');
   
-      // Show success message
-      alert('Booking created successfully!');
-  
-      // Redirect to the booking details page using trainId
-      router.push(`/booking/${trainId}`);
+      // Set success message
+      setSuccessMessage('Booking confirmed successfully! Your ticket has been booked.');
+      setTimeout(() => {
+        setSuccessMessage('');
+      }, 3000);
+      // Clear form data
+      setBookingData({
+        passengerName: '',
+        passengerAge: '',
+        seatNumber: '',
+        class: 'GENERAL',
+        bookingDate: new Date().toISOString().split('T')[0],
+        status: 'confirmed'
+      });
+      
+      // Clear any existing errors
+      setError('');
+      setFieldErrors({
+        passengerName: '',
+        passengerAge: '',
+        seatNumber: '',
+        bookingDate: ''
+      });
+
+      // Redirect after a delay
+      setTimeout(() => {
+        router.push(`/booking/${trainId}`);
+      }, 3000);
     } catch (err) {
       console.error('Error creating booking:', err);
-      setError('Failed to create booking after payment');
+      setError('Failed to create booking after payment. Please contact support.');
       setShowPaymentModal(false);
     }
   };
@@ -330,12 +419,29 @@ export default function BookingPage() {
     setClientSecret('');
   };
 
+  // Add success message component
+  const SuccessMessage = () => {
+    if (!successMessage) return null;
+    
+    return (
+      <div className="fixed top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded relative z-50 shadow-lg">
+        <div className="flex items-center">
+          <svg className="w-6 h-6 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+          </svg>
+          <span className="font-medium">{successMessage}</span>
+        </div>
+      </div>
+    );
+  };
+
   if (loading) return <div className="text-center p-8">Loading...</div>;
   if (error) return <div className="text-center text-red-500 p-8">{error}</div>;
   if (!train) return <div className="text-center p-8">Train not found</div>;
 
   return (
     <div className="max-w-4xl mx-auto p-6">
+      <SuccessMessage />
       <div className="bg-white rounded-lg shadow-md p-6 mb-6">
         <h2 className="text-2xl font-bold mb-4">Train Details</h2>
         <div className="grid grid-cols-2 gap-4">
@@ -388,10 +494,12 @@ export default function BookingPage() {
               value={bookingData.passengerName}
               onChange={handleChange}
               required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                fieldErrors.passengerName ? 'border-red-500' : 'border-gray-300'
+              }`}
             />
-            {error && bookingData.passengerName.length < 2 && (
-              <p className="text-red-500 text-sm mt-1">{error}</p>
+            {fieldErrors.passengerName && (
+              <p className="text-red-500 text-sm mt-1">{fieldErrors.passengerName}</p>
             )}
           </div>
 
@@ -408,10 +516,12 @@ export default function BookingPage() {
               required
               min="1"
               max="120"
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                fieldErrors.passengerAge ? 'border-red-500' : 'border-gray-300'
+              }`}
             />
-            {error && (isNaN(Number(bookingData.passengerAge)) || Number(bookingData.passengerAge) < 1 || Number(bookingData.passengerAge) > 120) && (
-              <p className="text-red-500 text-sm mt-1">{error}</p>
+            {fieldErrors.passengerAge && (
+              <p className="text-red-500 text-sm mt-1">{fieldErrors.passengerAge}</p>
             )}
           </div>
 
@@ -427,8 +537,13 @@ export default function BookingPage() {
               onChange={handleChange}
               min={new Date().toISOString().split('T')[0]}
               required
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+              className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
+                fieldErrors.bookingDate ? 'border-red-500' : 'border-gray-300'
+              }`}
             />
+            {fieldErrors.bookingDate && (
+              <p className="text-red-500 text-sm mt-1">{fieldErrors.bookingDate}</p>
+            )}
           </div>
 
           <div>
@@ -456,7 +571,7 @@ export default function BookingPage() {
                   key={seat.number}
                   type="button"
                   onClick={() => handleSeatSelect(seat)}
-                  className={`p-2 rounded-md text-center ${
+                  className={`p-2 rounded-md text-center flex flex-col items-center justify-center ${
                     bookingData.seatNumber === seat.number
                       ? 'bg-blue-600 text-white'
                       : seat.isAvailable
@@ -465,7 +580,8 @@ export default function BookingPage() {
                   }`}
                   disabled={!seat.isAvailable}
                 >
-                  {seat.number}
+                  <span className="font-medium">{seat.number}</span>
+                  <span className="text-xs mt-1">₹{seat.fare}</span>
                 </button>
               ))}
             </div>
@@ -515,7 +631,8 @@ export default function BookingPage() {
               <button
                 type="button"
                 onClick={handlePayment}
-                className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                className="bg-green-600 hover:bg-green-700 text-white font-bold py-2 px-6 rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 disabled:opacity-50 disabled:cursor-not-allowed"
+                disabled={!bookingData.passengerName || !bookingData.passengerAge || !bookingData.seatNumber}
               >
                 CONFIRM TICKET
               </button>

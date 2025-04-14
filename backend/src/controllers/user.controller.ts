@@ -40,11 +40,17 @@ export const registerUser = async (req: Request, res: Response) => {
         }
 
         // Validate password length
-        if (password.length < 6) {
+        // if (password.length < 6) {
+        //     return res.status(400).json({
+        //         message: 'Password must be at least 6 characters long'
+        //     });
+        // }
+        if (!/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?#&])[A-Za-z\d@$!%*?#&]{8,}$/.test(password)) {
             return res.status(400).json({
-                message: 'Password must be at least 6 characters long'
+                message: 'Password must be at least 8 characters long and include at least one uppercase letter, one lowercase letter, one number, and one special character'
             });
         }
+
 
         // Check if user already exists
         const existingUser = await User.findOne({

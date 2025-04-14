@@ -56,8 +56,12 @@ export default function Login() {
       if (!response.ok) {
         throw new Error('Invalid credentials');
       }
-      // Login successful - redirect to home page
-      router.push('/');
+
+      // Get return URL from query parameters
+      const returnUrl = searchParams?.get('returnUrl');
+      
+      // If there's a return URL, redirect to it, otherwise go to home page
+      router.push(returnUrl || '/');
     } catch (error: any) {
       setErrors({
         submit: 'Invalid credentials'

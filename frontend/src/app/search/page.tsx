@@ -46,8 +46,28 @@ export default function SearchResults() {
     fetchTrains();
   }, []);
 
-  const handleBookNow = (trainId: number) => {
-    router.push(`/book/${trainId}`);
+  const handleBookNow = async (trainId: number) => {
+    try {
+      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
+      const response = await fetch(`${baseUrl}/api/auth/check-auth`, {
+        method: 'GET',
+        credentials: 'include',
+      });
+
+      const data = await response.json();
+
+      if (!data.authenticated) {
+        // If not authenticated, redirect to login page with return URL
+        router.push(`/login?returnUrl=/book/${trainId}`);
+        return;
+      }
+
+      // If authenticated, proceed to booking page
+      router.push(`/book/${trainId}`);
+    } catch (error) {
+      console.error('Error checking authentication:', error);
+      router.push('/login');
+    }
   };
 
   if (isLoading) {

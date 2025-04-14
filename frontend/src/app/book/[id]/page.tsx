@@ -281,12 +281,16 @@ export default function BookTrain({ params }: { params: { id: string } }) {
 
   const handlePaymentSuccess = async () => {
     try {
-      await handleSubmit();
       setShowPaymentModal(false);
-      setSuccessMessage('Payment successful! ');
-      // Add a delay before redirecting to show the success message
+      setSuccessMessage('Payment successful! Processing your booking...');
       
-      // Auto-hide the success message after 3 seconds
+      // Submit the booking after successful payment
+      await handleSubmit();
+      
+      // Update success message after booking is complete
+      setSuccessMessage('Payment and booking completed successfully!');
+      
+      // Auto-hide the success message after 3 seconds and redirect
       setTimeout(() => {
         setSuccessMessage('');
       }, 3000);
@@ -456,7 +460,7 @@ export default function BookTrain({ params }: { params: { id: string } }) {
                         key={seat.number}
                         type="button"
                         onClick={() => handleSeatSelect(seat)}
-                        className={`p-2 rounded-md text-center ${
+                        className={`p-2 rounded-md text-center flex flex-col items-center justify-center ${
                           bookingData.seatNumber === seat.number
                             ? 'bg-blue-600 text-white'
                             : seat.isAvailable
@@ -465,7 +469,8 @@ export default function BookTrain({ params }: { params: { id: string } }) {
                         }`}
                         disabled={!seat.isAvailable}
                       >
-                        {seat.number}
+                        <span className="font-medium">{seat.number}</span>
+                        <span className="text-xs mt-1">₹{seat.fare}</span>
                       </button>
                     ))}
                   </div>

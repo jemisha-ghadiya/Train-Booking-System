@@ -16,6 +16,7 @@ interface Booking {
   status: string;
   createdAt: string;
   updatedAt: string;
+  fare: number;
   Train: {
     id: number;
     trainNumber: string;
@@ -281,7 +282,7 @@ export default function MyBookings() {
                         Seat: {booking.seatNumber}
                       </span>
                       <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-indigo-100 text-indigo-800">
-                        ₹{booking.Train.fare}
+                        ₹{booking.fare || (booking.Train.fare * (booking.class === 'GENERAL' ? 1 : booking.class === 'SLEEPER' ? 1.5 : 2)).toFixed(2)}
                       </span>
                       {booking.status.toLowerCase() === 'confirmed' && (
                         <button

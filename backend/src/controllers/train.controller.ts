@@ -5,6 +5,7 @@ import Booking from '../models/booking.model';
 import { verifyToken } from '../middleware/auth';
 import User from '../models/user.model';
 import Stripe from 'stripe';
+import { sendBookingConfirmationEmail } from '../utils/emailUtils';
 
 interface AuthenticatedRequest extends Request {
   user?: {
@@ -239,8 +240,14 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
       passengerAge,
       seatNumber,
       class: bookingClass,
-      status
+      status,
+      bookingDate: new Date() // Ensure this field is available in your model
     });
+
+    // Send confirmation email (only if status is confirmed)
+    if (status === 'confirmed') {
+      await sendBookingConfirmationEmail(user.email, booking, train);
+    }
 
     return res.status(201).json({ message: 'Booking created successfully', booking });
   } catch (error) {
@@ -302,6 +309,45 @@ export const cancelBooking = async (req: Request, res: Response) => {
     res.status(500).json({ message: 'Error cancelling booking', error });
   }
 };
+
+// export const cancelBooking = async (req: Request, res: Response) => {
+//   try {
+//     const { bookingId } = req.params;
+//     const userId = req.user?.id;
+
+//     if (!userId) {
+//       return res.status(401).json({ message: 'User not authenticated' });
+//     }
+
+//     const booking = await Booking.findOne({ where: { id: bookingId, userId } });
+
+//     if (!booking) {
+//       return res.status(404).json({ message: 'Booking not found' });
+//     }
+
+//     const train = await Train.findByPk(booking.trainId);
+
+//     if (!train) {
+//       return res.status(404).json({ message: 'Associated train not found' });
+//     }
+
+//     const departureTime = new Date(train.departureTime);
+//     const now = new Date();
+
+//     const hoursUntilDeparture = (departureTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+
+//     if (hoursUntilDeparture < 24) {
+//       return res.status(400).json({ message: 'Cannot delete booking less than 24 hours before departure' });
+//     }
+
+//     await booking.destroy();
+
+//     return res.status(200).json({ message: 'Booking deleted successfully' });
+//   } catch (error) {
+//     console.error('Error deleting booking:', error);
+//     return res.status(500).json({ message: 'Internal server error' });
+//   }
+// };
 
 export const createTrain = async (req: Request, res: Response) => {
   try {
