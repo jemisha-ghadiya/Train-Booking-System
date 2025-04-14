@@ -46,3 +46,36 @@ export const sendWelcomeEmail = async (email: string, username: string) => {
         throw new Error('Failed to send welcome email');
     }
 };
+
+export const sendBookingConfirmationEmail = async (email: string, booking: any, train: any) => {
+    try {
+      const mailOptions = {
+        from: '"RailBooking" <noreply@railbooking.com>',
+        to: email,
+        subject: `Booking Confirmed for ${booking.passengerName}`,
+        html: `
+          <h2>Booking Confirmation</h2>
+          <p>Dear ${booking.passengerName},</p>
+          <p>Your train ticket has been successfully booked!</p>
+          <ul>
+            <li><strong>Train:</strong> ${train.trainName} (${train.trainNumber})</li>
+            <li><strong>From:</strong> ${train.source}</li>
+            <li><strong>To:</strong> ${train.destination}</li>
+            <li><strong>Departure:</strong> ${new Date(train.departureTime).toLocaleString()}</li>
+            <li><strong>Arrival:</strong> ${new Date(train.arrivalTime).toLocaleString()}</li>
+            <li><strong>Seat Number:</strong> ${booking.seatNumber}</li>
+            <li><strong>Class:</strong> ${booking.class}</li>
+            <li><strong>Booking Date:</strong> ${booking.bookingDate}</li>
+            <li><strong>Status:</strong> ${booking.status}</li>
+          </ul>
+          <p>Thank you for choosing RailBooking!</p>
+        `
+      };
+  
+      await transporter.sendMail(mailOptions);
+      console.log(`Booking confirmation email sent to ${email}`);
+    } catch (error) {
+      console.error('Error sending booking confirmation email:', error);
+      throw new Error('Failed to send booking confirmation email');
+    }
+  };

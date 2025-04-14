@@ -252,48 +252,29 @@ export const createBooking = async (req: AuthenticatedRequest, res: Response) =>
 // Get user's bookings
 export const getUserBookings = async (req: Request, res: Response) => {
   try {
-    console.log('User from request:', req.user);
-    const userId = req.user?.id;
+    const user = req.user;
 
-    if (!userId) {
-      console.log('No user ID found in request');
-      return res.status(401).json({ message: 'User not authenticated' });
+    if (!user || typeof user.id !== 'number') {
+      return res.status(400).json({ message: 'Invalid or missing user ID' });
     }
 
-    console.log('Fetching bookings for user ID:', userId);
-    
-    // First, get all bookings for the user
     const bookings = await Booking.findAll({
-      where: { userId },
+      where: { userId: user.id },
       include: [
         {
           model: Train,
-          required: false // Use LEFT JOIN to include bookings even if train is not found
-        }
-      ]
+          as: 'Train',
+        },
+      ],
     });
 
-    console.log(`Found ${bookings.length} bookings for user ${userId}`);
-    res.status(200).json(bookings);
+    return res.status(200).json({ bookings });
   } catch (error) {
-    console.error('Error in getUserBookings:', error);
-    
-    // Provide more detailed error information
-    if (error instanceof Error) {
-      return res.status(500).json({ 
-        message: 'Error fetching bookings', 
-        error: {
-          name: error.name,
-          message: error.message,
-          stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
-        }
-      });
-    } else {
-      return res.status(500).json({ 
-        message: 'Error fetching bookings', 
-        error: 'Unknown error occurred'
-      });
-    }
+    console.error('Error retrieving user bookings:', error);
+    return res.status(500).json({
+      message: 'Error retrieving user bookings',
+      error,
+    });
   }
 };
 

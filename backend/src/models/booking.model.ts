@@ -75,5 +75,9 @@ Booking.init(
     tableName: 'bookings',
   }
 );
+Booking.belongsTo(Train, { foreignKey: 'trainId', as: 'Train' });
+Booking.belongsTo(User, { foreignKey: 'userId', as: 'User' });
+Train.hasMany(Booking, { foreignKey: 'trainId' });
+User.hasMany(Booking, { foreignKey: 'userId' });
 
 export default Booking; 

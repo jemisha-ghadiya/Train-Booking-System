@@ -40,9 +40,9 @@ export default function MyBookings() {
   const fetchBookings = async () => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
-      console.log('Fetching bookings from:', `${baseUrl}/api/trains/bookings`);
+      console.log('Fetching bookings from:', `${baseUrl}/api/trains/user/bookings`);
       
-      const response = await fetch(`${baseUrl}/api/trains/bookings`, {
+      const response = await fetch(`${baseUrl}/api/trains/user/bookings`, {
         method: 'GET',
         headers: {
           'Content-Type': 'application/json',
@@ -61,7 +61,24 @@ export default function MyBookings() {
 
       const data = await response.json();
       console.log('Bookings data:', data);
-      setBookings(data);
+      
+      // Ensure bookings is always an array
+      if (Array.isArray(data)) {
+        setBookings(data);
+      } else if (data && typeof data === 'object') {
+        // If data is an object, check if it has a bookings property that's an array
+        if (data.bookings && Array.isArray(data.bookings)) {
+          setBookings(data.bookings);
+        } else {
+          // If no bookings array found, set to empty array
+          console.warn('API response does not contain a bookings array:', data);
+          setBookings([]);
+        }
+      } else {
+        // If data is not an array or object, set to empty array
+        console.warn('Unexpected API response format:', data);
+        setBookings([]);
+      }
     } catch (err) {
       setError('Failed to load your bookings. Please try again later.');
       console.error('Error fetching bookings:', err);

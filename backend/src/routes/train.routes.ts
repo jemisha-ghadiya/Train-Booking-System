@@ -32,7 +32,7 @@ router.delete('/trains/:id',verifyToken, deleteTrain);
 
 // Protected routes (require authentication)
 router.post('/bookings', createBooking);
-router.get('/bookings',  getUserBookings);
+router.get('/user/bookings',  getUserBookings);
 router.put('/bookings/:bookingId/cancel',  cancelBooking);
 
 export default router; 
