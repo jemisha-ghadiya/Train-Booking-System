@@ -1,6 +1,7 @@
 'use client';
 
 import Navbar from '@/components/Navbar';
+import Footer from '@/components/Footer';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 
@@ -37,6 +38,7 @@ export default function Home() {
         headers: {
           'Content-Type': 'application/json',
         },
+        credentials: 'include',
         body: JSON.stringify({
           source: searchParams.from,
           destination: searchParams.to,
@@ -56,7 +58,6 @@ export default function Home() {
       setSearchMessage('Trains can not found');
     }
   };
-
   const handleBookNow = async (trainId: number) => {
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
@@ -91,127 +92,130 @@ export default function Home() {
   };
 
   return (
-    <div>
+    <div className="min-h-screen flex flex-col">
       <Navbar />
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-        <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">
-            Book Your Train Tickets
-          </h1>
-          <p className="text-lg text-gray-600">
-            Search and book train tickets for your journey
-          </p>
-        </div>
+      <div className="flex-grow">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
+          <div className="text-center mb-12">
+            <h1 className="text-4xl font-bold text-gray-900 mb-4">
+              Book Your Train Tickets
+            </h1>
+            <p className="text-lg text-gray-600">
+              Search and book train tickets for your journey
+            </p>
+          </div>
 
-        <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-md p-6">
-          <form className="space-y-4" onSubmit={handleSearch}>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative">
-                <label htmlFor="from" className="block text-sm font-medium text-gray-700">
-                  From
-                </label>
-                <input
-                  type="text"
-                  id="from"
-                  name="from"
-                  value={searchParams.from}
-                  onChange={handleInputChange}
-                  className="mt-1 block w-full pl-10 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="Enter departure station"
-                />
-                <i className="fas fa-train absolute left-3 top-3 text-gray-400"></i>
-              </div>
-              <div className="relative">
-                <label htmlFor="to" className="block text-sm font-medium text-gray-700">
-                  To
-                </label>
-                <input
-                  type="text"
-                  id="to"
-                  name="to"
-                  value={searchParams.to}
-                  onChange={handleInputChange}
-                  className="mt-1 block w-full pl-10 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  placeholder="Enter arrival station"
-                />
-                <i className="fas fa-train absolute left-3 top-3 text-gray-400"></i>
-              </div>
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div className="relative">
-                <label htmlFor="date" className="block text-sm font-medium text-gray-700">
-                  Departure Date
-                </label>
+          <div className="max-w-3xl mx-auto bg-white rounded-lg shadow-md p-6">
+            <form className="space-y-4" onSubmit={handleSearch}>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div className="relative">
+                  <label htmlFor="from" className="block text-sm font-medium text-gray-700">
+                    From
+                  </label>
                   <input
-                    type="date"
-                    id="date"
-                    name="date"
-                    value={searchParams.date}
+                    type="text"
+                    id="from"
+                    name="from"
+                    value={searchParams.from}
                     onChange={handleInputChange}
                     className="mt-1 block w-full pl-10 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    placeholder="Enter departure station"
                   />
-                  <i className="fas fa-calendar-alt absolute left-3 top-3 text-gray-400"></i>
+                  <i className="fas fa-train absolute left-3 top-3 text-gray-400"></i>
+                </div>
+                <div className="relative">
+                  <label htmlFor="to" className="block text-sm font-medium text-gray-700">
+                    To
+                  </label>
+                  <input
+                    type="text"
+                    id="to"
+                    name="to"
+                    value={searchParams.to}
+                    onChange={handleInputChange}
+                    className="mt-1 block w-full pl-10 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    placeholder="Enter arrival station"
+                  />
+                  <i className="fas fa-train absolute left-3 top-3 text-gray-400"></i>
                 </div>
               </div>
-              <div>
-                <label htmlFor="class" className="block text-sm font-medium text-gray-700">
-                  Class
-                </label>
-                <select
-                  id="class"
-                  name="class"
-                  value={searchParams.class}
-                  onChange={handleInputChange}
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                >
-                  <option>All Classes</option>
-                  <option>GENERAL</option>
-                  <option>SLEEPER</option>
-                  <option>AC</option>
-                </select>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="relative">
+                  <label htmlFor="date" className="block text-sm font-medium text-gray-700">
+                    Departure Date
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="date"
+                      id="date"
+                      name="date"
+                      value={searchParams.date}
+                      onChange={handleInputChange}
+                      className="mt-1 block w-full pl-10 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                    />
+                    <i className="fas fa-calendar-alt absolute left-3 top-3 text-gray-400"></i>
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="class" className="block text-sm font-medium text-gray-700">
+                    Class
+                  </label>
+                  <select
+                    id="class"
+                    name="class"
+                    value={searchParams.class}
+                    onChange={handleInputChange}
+                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  >
+                    <option>All Classes</option>
+                    <option>GENERAL</option>
+                    <option>SLEEPER</option>
+                    <option>AC</option>
+                  </select>
+                </div>
               </div>
-            </div>
-            
-            <div className="flex justify-center">
-              <button
-                type="submit"
-                className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <i className="fas fa-search mr-2"></i> Search Trains
-              </button>
-            </div>
-          </form>
-        </div>
+              
+              <div className="flex justify-center">
+                <button
+                  type="submit"
+                  className="inline-flex justify-center py-2 px-4 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                >
+                  <i className="fas fa-search mr-2"></i> Search Trains
+                </button>
+              </div>
+            </form>
+          </div>
 
-        {/* Display search results or message */}
-        <div className="mt-8">
-          {searchMessage && <p className="text-center text-red-500">{searchMessage}</p>}
-          {searchResults.length > 0 && (
-            <div className="mt-4">
-              <h2 className="text-2xl font-bold text-gray-900 mb-4">Search Results</h2>
-              <ul className="space-y-4">
-                {searchResults.map(train => (
-                  <li key={train.id} className="bg-white rounded-lg shadow-md p-4">
-                    <h3 className="text-lg font-bold">{train.trainName} ({train.trainNumber})</h3>
-                    <p>From: {train.source} To: {train.destination}</p>
-                    <p>Departure: {new Date(train.departureTime).toLocaleString()}</p>
-                    <p>Arrival: {new Date(train.arrivalTime).toLocaleString()}</p>
-                    <p>Available Seats: {train.availableSeats} / {train.totalSeats}</p>
-                    <p>Fare: ${train.fare}</p>
-                    <button
-                      onClick={() => handleBookNow(train.id)}
-                      className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-                    >
-                      Book Now
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
+          {/* Display search results or message */}
+          <div className="mt-8">
+            {searchMessage && <p className="text-center text-red-500">{searchMessage}</p>}
+            {searchResults.length > 0 && (
+              <div className="mt-4">
+                <h2 className="text-2xl font-bold text-gray-900 mb-4">Search Results</h2>
+                <ul className="space-y-4">
+                  {searchResults.map(train => (
+                    <li key={train.id} className="bg-white rounded-lg shadow-md p-4">
+                      <h3 className="text-lg font-bold">{train.trainName} ({train.trainNumber})</h3>
+                      <p>From: {train.source} To: {train.destination}</p>
+                      <p>Departure: {new Date(train.departureTime).toLocaleString()}</p>
+                      <p>Arrival: {new Date(train.arrivalTime).toLocaleString()}</p>
+                      <p>Available Seats: {train.availableSeats} / {train.totalSeats}</p>
+                      <p>Fare: ${train.fare}</p>
+                      <button
+                        onClick={() => handleBookNow(train.id)}
+                        className="mt-4 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                      >
+                        Book Now
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
         </div>
       </div>
+      <Footer />
     </div>
   );
 }

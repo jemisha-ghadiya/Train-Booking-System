@@ -90,8 +90,24 @@ const Navbar = () => {
     <nav className="bg-blue-600 text-white shadow-lg">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-16">
-          <Link href="" className="text-xl font-bold">
-            Train Booking System
+          <Link href="" className="flex items-center space-x-2">
+            <div className="flex-shrink-0">
+              <svg 
+                className="h-8 w-8 text-white" 
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24" 
+                xmlns="http://www.w3.org/2000/svg"
+              >
+                <path 
+                  strokeLinecap="round" 
+                  strokeLinejoin="round" 
+                  strokeWidth="2" 
+                  d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"
+                />
+              </svg>
+            </div>
+            <span className="text-xl font-bold">Train Booking System</span>
           </Link>
 
           <div className="flex items-center space-x-4">
@@ -100,6 +116,12 @@ const Navbar = () => {
             </Link>
             <Link href="/search" className="hover:bg-blue-700 px-3 py-2 rounded">
               Search Trains
+            </Link>
+            <Link href="/about" className="hover:bg-blue-700 px-3 py-2 rounded">
+              About Us
+            </Link>
+            <Link href="/contact" className="hover:bg-blue-700 px-3 py-2 rounded">
+              Contact Us
             </Link>
 
             <div className="relative" ref={dropdownRef}>

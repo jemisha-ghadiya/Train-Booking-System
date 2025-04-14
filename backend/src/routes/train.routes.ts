@@ -13,7 +13,7 @@ const router = Router();
 
 // Public routes
 router.get('/', getAllTrains);
-router.get('/search', searchTrains);
+router.post('/search', searchTrains);
 router.get('/:id', getTrainById);
 
 // Protected routes (require authentication)
