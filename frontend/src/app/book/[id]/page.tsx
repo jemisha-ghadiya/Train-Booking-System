@@ -52,7 +52,6 @@ export default function BookTrain({ params }: { params: { id: string } }) {
     passengerAge: '',
     seatNumber: '',
     class: 'GENERAL',
-    bookingDate: new Date().toISOString().split('T')[0],
     status: 'confirmed'
   });
   const [successMessage, setSuccessMessage] = useState('');
@@ -137,7 +136,8 @@ export default function BookTrain({ params }: { params: { id: string } }) {
         setIsProcessingPayment(true);
         try {
           await handleSubmit();
-          router.push('/dashboard/bookings');
+          // Immediately redirect to my-bookings page
+          router.push('/my-bookings');
         } catch (err) {
           setError('Error completing booking after payment');
           console.error(err);
@@ -181,7 +181,6 @@ export default function BookTrain({ params }: { params: { id: string } }) {
           passengerAge: parseInt(bookingData.passengerAge),
           seatNumber: bookingData.seatNumber,
           class: bookingData.class,
-          bookingDate: bookingData.bookingDate,
           status: bookingData.status
         })
       });
@@ -290,10 +289,8 @@ export default function BookTrain({ params }: { params: { id: string } }) {
       // Update success message after booking is complete
       setSuccessMessage('Payment and booking completed successfully!');
       
-      // Auto-hide the success message after 3 seconds and redirect
-      setTimeout(() => {
-        setSuccessMessage('');
-      }, 3000);
+      // Immediately redirect to my-bookings page
+      router.push('/my-bookings');
     } catch (err) {
       setError('Error completing booking');
       console.error(err);
@@ -420,21 +417,6 @@ export default function BookTrain({ params }: { params: { id: string } }) {
                 </div>
 
                 <div>
-                  <label htmlFor="bookingDate" className="block text-sm font-medium text-gray-700">
-                    Booking Date
-                  </label>
-                  <input
-                    type="date"
-                    id="bookingDate"
-                    name="bookingDate"
-                    value={bookingData.bookingDate}
-                    onChange={handleChange}
-                    min={new Date().toISOString().split('T')[0]}
-                    className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
-                  />
-                </div>
-
-                <div>
                   <label htmlFor="classSelection" className="block text-sm font-medium text-gray-700">
                     Select Class
                   </label>
@@ -444,8 +426,8 @@ export default function BookTrain({ params }: { params: { id: string } }) {
                     onChange={handleClassChange}
                     className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
                   >
-                    <option value="GENERAL">General</option>
-                    <option value="SLEEPER">Sleeper</option>
+                    <option value="GENERAL">GENERAL</option>
+                    <option value="SLEEPER">SLEEPER</option>
                     <option value="AC">AC</option>
                   </select>
                 </div>

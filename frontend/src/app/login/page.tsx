@@ -25,10 +25,69 @@ export default function Login() {
     }
   }, [searchParams]);
 
+  // Add validation functions
+  const validateEmail = (email: string) => {
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+    return emailRegex.test(email);
+  };
+
+  const validateUsername = (username: string) => {
+    const usernameRegex = /^[a-zA-Z0-9._]+$/;
+    return usernameRegex.test(username);
+  };
+
+  const validatePassword = (password: string) => {
+    const minLength = 8;
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasLowerCase = /[a-z]/.test(password);
+    const hasNumbers = /\d/.test(password);
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>]/.test(password);
+    
+    const errors = [];
+    if (password.length < minLength) errors.push('at least 8 characters');
+    if (!hasUpperCase) errors.push('one uppercase letter');
+    if (!hasLowerCase) errors.push('one lowercase letter');
+    if (!hasNumbers) errors.push('one number');
+    if (!hasSpecialChar) errors.push('one special character');
+    
+    return errors;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
     setErrors({});
+
+    // Validate username format if input doesn't contain @
+    if (!formData.usernameOrEmail.includes('@') && !validateUsername(formData.usernameOrEmail)) {
+      setErrors(prev => ({
+        ...prev,
+        usernameOrEmail: 'Username can only contain letters, numbers, dots (.) and underscores (_)'
+      }));
+      setIsLoading(false);
+      return;
+    }
+
+    // Validate email format if input contains @
+    if (formData.usernameOrEmail.includes('@') && !validateEmail(formData.usernameOrEmail)) {
+      setErrors(prev => ({
+        ...prev,
+        usernameOrEmail: 'Please enter a valid email address'
+      }));
+      setIsLoading(false);
+      return;
+    }
+
+    // Validate password strength
+    const passwordErrors = validatePassword(formData.password);
+    if (passwordErrors.length > 0) {
+      setErrors(prev => ({
+        ...prev,
+        password: `Password must contain ${passwordErrors.join(', ')}`
+      }));
+      setIsLoading(false);
+      return;
+    }
 
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000';
@@ -77,12 +136,44 @@ export default function Login() {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
+
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
         ...prev,
         [name]: ''
       }));
+    }
+
+    // Validate username format on change if it's not an email
+    if (name === 'usernameOrEmail' && !value.includes('@')) {
+      if (!validateUsername(value)) {
+        setErrors(prev => ({
+          ...prev,
+          usernameOrEmail: 'Username can only contain letters, numbers, dots (.) and underscores (_)'
+        }));
+      }
+    }
+
+    // Validate email format on change if it's an email
+    if (name === 'usernameOrEmail' && value.includes('@')) {
+      if (!validateEmail(value)) {
+        setErrors(prev => ({
+          ...prev,
+          usernameOrEmail: 'Please enter a valid email address'
+        }));
+      }
+    }
+
+    // Validate password strength on change
+    if (name === 'password') {
+      const passwordErrors = validatePassword(value);
+      if (passwordErrors.length > 0) {
+        setErrors(prev => ({
+          ...prev,
+          password: `Password must contain ${passwordErrors.join(', ')}`
+        }));
+      }
     }
   };
 
@@ -136,9 +227,14 @@ export default function Login() {
                     required
                     value={formData.usernameOrEmail}
                     onChange={handleChange}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className={`appearance-none block w-full px-3 py-2 border ${
+                      errors.usernameOrEmail ? 'border-red-500' : 'border-gray-300'
+                    } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
                     placeholder="Enter your username or email"
                   />
+                  {errors.usernameOrEmail && (
+                    <p className="mt-1 text-sm text-red-600">{errors.usernameOrEmail}</p>
+                  )}
                 </div>
               </div>
 
@@ -154,8 +250,13 @@ export default function Login() {
                     required
                     value={formData.password}
                     onChange={handleChange}
-                    className="appearance-none block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500"
+                    className={`appearance-none block w-full px-3 py-2 border ${
+                      errors.password ? 'border-red-500' : 'border-gray-300'
+                    } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
                   />
+                  {errors.password && (
+                    <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+                  )}
                 </div>
               </div>
 

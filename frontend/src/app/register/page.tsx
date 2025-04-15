@@ -37,8 +37,16 @@ export default function Register() {
     // Password validation
     if (!formData.password) {
       newErrors.password = 'Password is required';
-    } else if (formData.password.length < 6) {
-      newErrors.password = 'Password must be at least 6 characters long';
+    } else if (formData.password.length < 8) {
+      newErrors.password = 'Password must be at least 8 characters long';
+    } else if (!/(?=.*[a-z])/.test(formData.password)) {
+      newErrors.password = 'Password must contain at least one lowercase letter';
+    } else if (!/(?=.*[A-Z])/.test(formData.password)) {
+      newErrors.password = 'Password must contain at least one uppercase letter';
+    } else if (!/(?=.*\d)/.test(formData.password)) {
+      newErrors.password = 'Password must contain at least one number';
+    } else if (!/(?=.*[!@#$%^&*])/.test(formData.password)) {
+      newErrors.password = 'Password must contain at least one special character (!@#$%^&*)';
     }
 
     // Confirm password validation
@@ -53,7 +61,10 @@ export default function Register() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!validateForm()) {
+    // Always validate the form before submission
+    const isValid = validateForm();
+    
+    if (!isValid) {
       return;
     }
 
@@ -64,6 +75,7 @@ export default function Register() {
         headers: {
           'Content-Type': 'application/json',
         },
+        // credentials: 'include',
         body: JSON.stringify({
           username: formData.username,
           email: formData.email,
@@ -90,30 +102,69 @@ export default function Register() {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
-    
-    // Special handling for email field to prevent spaces
-    if (name === 'email') {
-      const emailWithoutSpaces = value.replace(/\s/g, '');
+
+    if (name === 'username') {
+      const usernameWithoutSpaces = value.replace(/\s/g, '');
       setFormData(prev => ({
         ...prev,
-        [name]: emailWithoutSpaces
+        [name]: usernameWithoutSpaces
       }));
+
+      if (!usernameWithoutSpaces) {
+        setErrors(prev => ({
+          ...prev,
+          username: 'Username is required'
+        }));
+      } else if (!/^[a-zA-Z0-9_.]+$/.test(usernameWithoutSpaces)) {
+        setErrors(prev => ({
+          ...prev,
+          username: 'Username can only contain letters, numbers, underscores, and dots'
+        }));
+      } else {
+        setErrors(prev => ({
+          ...prev,
+          username: ''
+        }));
+      }
+    } else if (name === 'email') {
+      const emailTrimmed = value.trim().replace(/\s/g, '');
+
+      setFormData(prev => ({
+        ...prev,
+        email: emailTrimmed
+      }));
+
+      if (!emailTrimmed) {
+        setErrors(prev => ({
+          ...prev,
+          email: 'Email is required'
+        }));
+      } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailTrimmed)) {
+        setErrors(prev => ({
+          ...prev,
+          email: 'Invalid email format'
+        }));
+      } else {
+        setErrors(prev => ({
+          ...prev,
+          email: ''
+        }));
+      }
     } else {
       setFormData(prev => ({
         ...prev,
         [name]: value
       }));
-    }
-    
-    // Clear error when user starts typing
-    if (errors[name]) {
-      setErrors(prev => ({
-        ...prev,
-        [name]: ''
-      }));
+
+      if (errors[name]) {
+        setErrors(prev => ({
+          ...prev,
+          [name]: ''
+        }));
+      }
     }
   };
-
+  
   return (
     <div>
       <Navbar />
@@ -150,7 +201,12 @@ export default function Register() {
                     } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
                   />
                   {errors.username && (
-                    <p className="mt-1 text-sm text-red-600">{errors.username}</p>
+                    <p className="mt-1 text-sm text-red-600 flex items-center">
+                      <svg className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      {errors.username}
+                    </p>
                   )}
                 </div>
               </div>
@@ -168,16 +224,25 @@ export default function Register() {
                     required
                     value={formData.email}
                     onChange={handleChange}
+                    onKeyDown={(e) => {
+                      if (e.key === ' ') {
+                        e.preventDefault();
+                      }
+                    }}
                     className={`appearance-none block w-full px-3 py-2 border ${
                       errors.email ? 'border-red-300' : 'border-gray-300'
                     } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
                   />
                   {errors.email && (
-                    <p className="mt-1 text-sm text-red-600">{errors.email}</p>
+                    <p className="mt-1 text-sm text-red-600 flex items-center">
+                      <svg className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      {errors.email}
+                    </p>
                   )}
                 </div>
               </div>
-
               <div>
                 <label htmlFor="password" className="block text-sm font-medium text-gray-700">
                   Password
@@ -195,7 +260,12 @@ export default function Register() {
                     } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
                   />
                   {errors.password && (
-                    <p className="mt-1 text-sm text-red-600">{errors.password}</p>
+                    <p className="mt-1 text-sm text-red-600 flex items-center">
+                      <svg className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      {errors.password}
+                    </p>
                   )}
                 </div>
               </div>
@@ -217,14 +287,28 @@ export default function Register() {
                     } rounded-md shadow-sm placeholder-gray-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500`}
                   />
                   {errors.confirmPassword && (
-                    <p className="mt-1 text-sm text-red-600">{errors.confirmPassword}</p>
+                    <p className="mt-1 text-sm text-red-600 flex items-center">
+                      <svg className="h-4 w-4 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                      </svg>
+                      {errors.confirmPassword}
+                    </p>
                   )}
                 </div>
               </div>
 
               {errors.submit && (
                 <div className="rounded-md bg-red-50 p-4">
-                  <p className="text-sm text-red-600">{errors.submit}</p>
+                  <div className="flex">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-400" fill="currentColor" viewBox="0 0 20 20">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3">
+                      <p className="text-sm text-red-700">{errors.submit}</p>
+                    </div>
+                  </div>
                 </div>
               )}
 

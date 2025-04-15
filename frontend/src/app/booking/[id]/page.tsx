@@ -380,9 +380,7 @@ export default function BookingPage() {
   
       // Set success message
       setSuccessMessage('Booking confirmed successfully! Your ticket has been booked.');
-      setTimeout(() => {
-        setSuccessMessage('');
-      }, 3000);
+      
       // Clear form data
       setBookingData({
         passengerName: '',
@@ -402,10 +400,10 @@ export default function BookingPage() {
         bookingDate: ''
       });
 
-      // Redirect after a delay
+      // Redirect to my-bookings page after a short delay
       setTimeout(() => {
-        router.push(`/booking/${trainId}`);
-      }, 3000);
+        router.push('/my-bookings');
+      }, 1500);
     } catch (err) {
       console.error('Error creating booking:', err);
       setError('Failed to create booking after payment. Please contact support.');
@@ -525,27 +523,7 @@ export default function BookingPage() {
             )}
           </div>
 
-          <div>
-            <label htmlFor="bookingDate" className="block text-sm font-medium text-gray-700">
-              Booking Date
-            </label>
-            <input
-              type="date"
-              id="bookingDate"
-              name="bookingDate"
-              value={bookingData.bookingDate}
-              onChange={handleChange}
-              min={new Date().toISOString().split('T')[0]}
-              required
-              className={`mt-1 block w-full rounded-md shadow-sm focus:ring-blue-500 focus:border-blue-500 ${
-                fieldErrors.bookingDate ? 'border-red-500' : 'border-gray-300'
-              }`}
-            />
-            {fieldErrors.bookingDate && (
-              <p className="text-red-500 text-sm mt-1">{fieldErrors.bookingDate}</p>
-            )}
-          </div>
-
+          
           <div>
             <label htmlFor="classSelection" className="block text-sm font-medium text-gray-700">
               Select Class
